@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&amp;family=Source+Sans+3:wght@400;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
-  <link rel="stylesheet" href="style.css?v=20261018T123350077vhb">
+  <link rel="stylesheet" href="style.css?v=20261018T124359288rih">
 </head>
 <body>
   <button class="skip-link" id="skip-link" type="button">Skip to content</button>
@@ -21,9 +21,12 @@
     <div class="row row-1">
       <button id="nav-toggle" class="icon-btn nav-toggle" type="button" aria-label="Open sections" aria-controls="sidebar" aria-expanded="false">☰</button>
       <a class="brand" href="#/">Mysteries Wiki</a>
-      <button id="reading-pill" class="reading-pill" type="button" aria-controls="chapter-sheet" aria-expanded="false">
-        <span class="muted">Reading</span> <strong id="reading-pill-ch">Ch 1</strong> <span aria-hidden="true">▾</span>
+      <button id="bar-prev" class="icon-btn bar-step" type="button" title="Previous chapter (←)" aria-label="Previous chapter">‹</button>
+      <button id="reading-pill" class="reading-pill" type="button" aria-controls="chapter-sheet" aria-expanded="false" aria-label="Choose the chapter you have read up to">
+        <span class="muted">Reading</span> <strong><span id="reading-pill-vol" class="pill-vol"></span><span id="reading-pill-ch">Ch 1</span></strong>
+        <span id="reading-pill-title" class="pill-title"></span> <span aria-hidden="true">▾</span>
       </button>
+      <button id="bar-next" class="icon-btn bar-step" type="button" title="Next chapter (→)" aria-label="Next chapter">›</button>
       <button id="search-toggle" class="icon-btn search-toggle" type="button" aria-label="Search" aria-controls="search-form" aria-expanded="false">⌕</button>
     </div>
     <div class="row row-2">
@@ -40,7 +43,9 @@
         <button id="sheet-theme" class="btn btn-outline sheet-theme" type="button">Switch theme</button>
       </div>
       <form class="search" id="search-form" role="search">
-        <input id="search-input" type="search" placeholder="Search facts… ( / )" autocomplete="off" aria-label="Search facts">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input id="search-input" type="search" placeholder="Search the wiki" autocomplete="off" aria-label="Search the wiki" aria-keyshortcuts="/">
+        <kbd class="search-kbd" aria-hidden="true">/</kbd>
       </form>
       <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle theme">◐</button>
     </div>
@@ -69,6 +74,6 @@
     <main class="content" id="content"><p class="muted">Loading…</p></main>
   </div>
 
-  <script type="module" src="js/main.js?v=20261018T123350077vhb"></script>
+  <script type="module" src="js/main.js?v=20261018T124359288rih"></script>
 </body>
 </html>

@@ -80,6 +80,7 @@ function recapHtml(o) {
   for (const h of s.headlines) lines.push(h.value);
   const shown = lines.slice(0, 3).map(esc).join(' · ') || `${plural(s.facts, 'new fact')} in ${plural(s.chapters, 'chapter')}`;
   return `<div class="recap" role="region" aria-label="Since you last read">
+    <span class="recap-icon" aria-hidden="true">↺</span>
     <div class="recap-text"><strong>Since you last read (ch ${s.from} → ${store.ch}):</strong> ${shown}</div>
     <button type="button" class="btn btn-outline" id="recap-all">See all ${plural(s.facts, 'change')}</button>
     <button type="button" class="icon-btn recap-close" id="recap-close" aria-label="Dismiss">×</button>

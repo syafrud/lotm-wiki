@@ -1,4 +1,5 @@
-// "Read up to" picker: volume + chapter selects and the ‹ › buttons.
+// "Read up to" picker: volume + chapter selects and the ‹ › buttons, in a sheet opened from the
+// "Reading …" pill (a bottom sheet on phones, a drop-down under the pill on wider screens).
 // The server withholds titles after ch + 1 and the names of volumes not started yet, so the list
 // is refetched whenever the reading chapter changes.
 import { $, esc, storage, chapterTitle } from '../util.js';
@@ -11,6 +12,8 @@ const volSelect = $('#volume-select');
 const prev = $('#chapter-prev');
 const next = $('#chapter-next');
 const pill = $('#reading-pill');
+const barPrev = $('#bar-prev');
+const barNext = $('#bar-next');
 const sheetOverlay = $('#sheet-overlay');
 
 export async function loadChapters(ch) {
@@ -43,9 +46,13 @@ export function syncPickers() {
   select.innerHTML = (v?.chapters ?? []).map(c => `<option value="${c.n}">Ch ${c.n}${c.title ? ': ' + esc(chapterTitle(c.title)) : ''}</option>`).join('');
   select.value = String(store.ch);
   const i = store.chapters.findIndex(c => c.n === store.ch);
-  prev.disabled = i <= 0;
-  next.disabled = i === -1 || i >= store.chapters.length - 1;
+  prev.disabled = barPrev.disabled = i <= 0;
+  next.disabled = barNext.disabled = i === -1 || i >= store.chapters.length - 1;
   $('#reading-pill-ch').textContent = `Ch ${store.ch}`;
+  // desktop pill: "Reading Vol 2 · Ch 321 Appearance of a Living Person" (mockup 02)
+  const vol = /^Volume (\d+)/.exec(cur?.volume ?? '')?.[1];
+  $('#reading-pill-vol').textContent = vol ? `Vol ${vol} · ` : '';
+  $('#reading-pill-title').textContent = cur?.title ? chapterTitle(cur.title) : '';
 }
 
 // ---- phones: the picker is a bottom sheet opened from the "Reading Ch N" pill ----
@@ -57,6 +64,8 @@ export function openSheet() {
   sheetOverlay.hidden = false;
   pill.setAttribute('aria-expanded', 'true');
   // the sheet is visibility:hidden until the new class applies: flush styles, then focus
+  // desktop: the picker drops down under the pill
+  $('#chapter-sheet').style.left = matchMedia('(min-width: 761px)').matches ? `${Math.max(8, pill.getBoundingClientRect().left)}px` : '';
   void $('#chapter-sheet').offsetHeight;
   select.focus();
 }
@@ -104,6 +113,8 @@ export function initPicker() {
   });
   prev.addEventListener('click', () => stepChapter(-1));
   next.addEventListener('click', () => stepChapter(1));
+  barPrev.addEventListener('click', () => stepChapter(-1));
+  barNext.addEventListener('click', () => stepChapter(1));
   pill.addEventListener('click', () => (sheetOpen() ? closeSheet() : openSheet()));
   $('#sheet-close').addEventListener('click', () => closeSheet());
   sheetOverlay.addEventListener('click', () => closeSheet());
