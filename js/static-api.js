@@ -3,7 +3,7 @@
 // is answered by the same route() the Node server uses. Only `node cli.js export-site` ships
 // this file's imports (js/core/, js/vendor/); the server build never loads it.
 import sqlite3InitModule from './vendor/sqlite-wasm/index.mjs';
-import { openWasmDb } from './core/wasm-db.js';
+import { prepareStaticDb } from './core/wasm-db.js';
 import { route } from './core/api-router.js';
 
 let ready = null;
@@ -45,7 +45,7 @@ function open() {
     try {
       const build = await (await fetch('data/build.json', { cache: 'no-cache' })).json();
       const [sqlite3, bytes] = await Promise.all([sqlite3InitModule(), download(`data/${build.file}`, build.gz_bytes, bar)]);
-      return openWasmDb(sqlite3, bytes);
+      return prepareStaticDb(sqlite3, bytes, build); // indexes now, full-text tables on the first search
     } finally {
       bar.done();
     }
@@ -58,7 +58,9 @@ function open() {
 export async function staticApi(path, { method = 'GET' } = {}) {
   if (method !== 'GET') throw Object.assign(new Error('Not available in this read-only version of the wiki.'), { status: 405 });
   const db = await open();
-  const r = route(db, new URL(path, location.href));
+  const url = new URL(path, location.href);
+  if (url.pathname.endsWith('/api/search')) db.ensureFts();
+  const r = route(db, url);
   if (r.status !== 200) throw Object.assign(new Error(r.body?.error ?? `${r.status}`), { status: r.status });
   return r.body;
 }

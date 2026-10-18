@@ -110,23 +110,25 @@ export function sectionRows(db, key, n, { imp = null, sort = 'importance', q = '
   const imps = imp ? String(imp).split(',').filter(Boolean) : [];
   if (imps.some(i => !IMPORTANCE.includes(i))) throw new ApiError(400, `imp is one or more of ${IMPORTANCE.join(', ')}`);
 
-  const chs = new Map(); // id -> [ch...]
-  for (const r of db.prepare('SELECT id, ch FROM entity_chapters WHERE section = ? AND ch <= ? ORDER BY ch').all(key, n)) {
-    (chs.get(r.id) ?? chs.set(r.id, []).get(r.id)).push(r.ch);
+  // chapters each entity appears in: the grouped view needs every one (grouping by appearances),
+  // the list only the first, the last and how many (one row per entity instead of per chapter)
+  const chs = new Map(); // id -> { first, last, count, list? }
+  if (view === 'groups') {
+    for (const r of db.prepare('SELECT id, ch FROM entity_chapters WHERE section = ? AND ch <= ? ORDER BY ch').all(key, n)) {
+      const c = chs.get(r.id) ?? chs.set(r.id, { first: r.ch, list: [] }).get(r.id);
+      c.list.push(r.ch); c.last = r.ch; c.count = c.list.length;
+    }
+  } else {
+    for (const r of db.prepare(`SELECT id, MIN(ch) first, MAX(ch) last, COUNT(*) count FROM entity_chapters
+        WHERE section = ? AND ch <= ? GROUP BY id ORDER BY MIN(ch), id`).all(key, n)) chs.set(r.id, r);
   }
-  // scalar facts + what grouping needs (affiliations, with removals)
+  // scalar facts + what grouping needs (affiliations, with removals); headlines and previews are
+  // read later, only for the rows this answer returns (PLAN B2.0: half the rows of this query)
   const ents = new Map();
   for (const r of db.prepare(`SELECT entity_id, field, value, ch, op FROM facts
-      WHERE section = ? AND ch <= ? AND field IN (${sqlList([...SCALAR_FIELDS, 'affiliations', 'headline'])}) ORDER BY ch, ord`).all(key, n)) {
+      WHERE section = ? AND ch <= ? AND field IN (${sqlList([...SCALAR_FIELDS, 'affiliations'])}) ORDER BY ch, ord`).all(key, n)) {
     const e = ents.get(r.entity_id) ?? ents.set(r.entity_id, {}).get(r.entity_id);
     (e[r.field] ??= []).push(fact(r));
-  }
-  // preview: the newest fact outside the header fields
-  const preview = new Map();
-  for (const r of db.prepare(`SELECT entity_id, field, value, ch FROM (
-      SELECT entity_id, field, value, ch, ROW_NUMBER() OVER (PARTITION BY entity_id ORDER BY ch DESC, ord) rn
-      FROM facts WHERE section = ? AND ch <= ? AND field NOT IN (${sqlList([...HEADER_FIELDS])})) WHERE rn = 1`).all(key, n)) {
-    preview.set(r.entity_id, { field: r.field, value: clip(r.value, PREVIEW_MAX), ch: r.ch });
   }
 
   // identities of what these entities point at: an organisation's "(parent or base)", the
@@ -138,26 +140,26 @@ export function sectionRows(db, key, n, { imp = null, sort = 'importance', q = '
   let rows = [];
   let all = 0, maxApps = 0;
   const impCounts = Object.fromEntries(IMPORTANCE.map(i => [i, 0]));
-  for (const [id, list] of chs) {
+  for (const [id, c] of chs) {
     const e = ents.get(id) ?? {};
-    e._chapters = list.map(ch => ({ value: '', ch })); // for grouping by appearances
+    if (c.list) e._chapters = c.list.map(ch => ({ value: '', ch })); // for grouping by appearances
     const heading = headingOf(key, id, e, n, resolve);
     const m = metaOf(e, n);
     all++;
-    maxApps = Math.max(maxApps, list.length);
+    maxApps = Math.max(maxApps, c.count);
     if (needle && !heading.toLowerCase().includes(needle) && !id.includes(needle)) continue;
     if (m.importance in impCounts) impCounts[m.importance]++;
     if (imps.length && !imps.includes(m.importance)) continue;
-    const headline = latestFact(e.headline, n);
     rows.push({
       id, heading, meta: m,
-      first_ch: list[0], last_ch: list.at(-1), appearances: list.length, isNew: list[0] === n,
-      preview: headline ? { field: 'headline', value: headline.value, ch: headline.ch } : preview.get(id) ?? null,
+      first_ch: c.first, last_ch: c.last, appearances: c.count, isNew: c.first === n,
+      preview: null,
       imp: rank(IMPORTANCE, m.importance), _entity: e,
     });
   }
   rows.sort(SORTS[sort]);
   const slim = (r) => { const { imp: _i, _entity, ...rest } = r; return rest; };
+  const withPreviews = (list) => { const p = previewsFor(db, key, list.map(x => x.id), n); for (const x of list) x.preview = p.get(x.id) ?? null; return list; };
   const stats = { all, imp_counts: impCounts, stale: rows.filter(r => n - r.last_ch > STALE_AFTER).length, max_appearances: maxApps };
 
   if (view === 'groups') {
@@ -170,10 +172,30 @@ export function sectionRows(db, key, n, { imp = null, sort = 'importance', q = '
     // locations are one depth-first tree: each row gets its depth and ancestor headings
     const byId = new Map(rows.map(r => [r.id, r]));
     for (const g of grouped) for (const x of g.entries) if (x.depth != null) Object.assign(byId.get(x.id), { depth: x.depth, path: x.path });
-    return { section: key, ch: n, total: rows.length, ...stats, rows: rows.map(slim), groups: grouped.map(strip) };
+    return { section: key, ch: n, total: rows.length, ...stats, rows: withPreviews(rows).map(slim), groups: grouped.map(strip) };
   }
   if (view !== 'list') throw new ApiError(400, 'view is list or groups');
-  return { section: key, ch: n, total: rows.length, ...stats, offset, limit, rows: rows.slice(offset, offset + limit).map(slim) };
+  return { section: key, ch: n, total: rows.length, ...stats, offset, limit, rows: withPreviews(rows.slice(offset, offset + limit)).map(slim) };
+}
+
+// The preview line of each entity: its latest headline, else its newest fact outside the header
+// fields. One indexed lookup per entity (facts_field / facts_entity), not a scan of the section.
+function previewsFor(db, key, ids, n) {
+  const out = new Map();
+  if (!ids.length) return out;
+  for (const r of db.prepare(`SELECT j.value entity_id, f.value, f.ch FROM json_each(?) j JOIN facts f ON f.id = (
+      SELECT x.id FROM facts x WHERE x.section = ? AND x.entity_id = j.value AND x.field = 'headline' AND x.ch <= ?
+      ORDER BY x.ch DESC, x.ord DESC, x.id DESC LIMIT 1)`).all(JSON.stringify(ids), key, n)) {
+    out.set(r.entity_id, { field: 'headline', value: r.value, ch: r.ch });
+  }
+  const rest = ids.filter(id => !out.has(id));
+  if (!rest.length) return out;
+  for (const r of db.prepare(`SELECT j.value entity_id, f.field, f.value, f.ch FROM json_each(?) j JOIN facts f ON f.id = (
+      SELECT x.id FROM facts x WHERE x.section = ? AND x.entity_id = j.value AND x.ch <= ? AND x.field NOT IN (${sqlList([...HEADER_FIELDS])})
+      ORDER BY x.ch DESC, x.ord, x.id LIMIT 1)`).all(JSON.stringify(rest), key, n)) {
+    out.set(r.entity_id, { field: r.field, value: clip(r.value, PREVIEW_MAX), ch: r.ch });
+  }
+  return out;
 }
 
 // ---- /api/locations -------------------------------------------------------------------------
@@ -241,7 +263,6 @@ export function entityOverview(db, section, id, n, { since = null } = {}) {
 
   const chapterRows = db.prepare(`SELECT ec.ch, c.title, ec.n_facts FROM entity_chapters ec JOIN chapters c ON c.n = ec.ch
     WHERE ec.section = ? AND ec.id = ? AND ec.ch <= ? ORDER BY ec.ch`).all(section, id, n);
-  const headlineAt = new Map((facts.headline ?? []).map(f => [f.ch, f.value]));
 
   const fields = [];
   const order = [...sec.fields, ...Object.keys(facts).filter(f => !sec.fields.includes(f))];
@@ -285,6 +306,7 @@ export function entityOverview(db, section, id, n, { since = null } = {}) {
   // chapter both appear in (facts or mentions), each of the last CONNECTIONS_RECENT chapters
   // counting 1.5 — plus the chapters that link them by reference. A character's list keeps to people.
   const score = new Map(); // "section:id" -> { together, score }
+  const peopleOnly = section === 'characters' ? 'characters' : null;
   const add = (sec2, id2, together, points) => {
     if (sec2 === section && id2 === id) return;
     if (section === 'characters' && sec2 !== 'characters') return;
@@ -294,7 +316,7 @@ export function entityOverview(db, section, id, n, { since = null } = {}) {
   };
   for (const r of db.prepare(`SELECT b.section s, b.id i, COUNT(*) c, SUM(b.ch > ?) recent
       FROM entity_chapters a JOIN entity_chapters b ON b.ch = a.ch AND NOT (b.section = a.section AND b.id = a.id)
-      WHERE a.section = ? AND a.id = ? AND a.ch <= ? GROUP BY b.section, b.id`).all(n - CONNECTIONS_RECENT, section, id, n)) add(r.s, r.i, r.c, r.c + r.recent / 2);
+      WHERE a.section = ? AND a.id = ? AND a.ch <= ? AND (? IS NULL OR b.section = ?) GROUP BY b.section, b.id`).all(n - CONNECTIONS_RECENT, section, id, n, peopleOnly, peopleOnly)) add(r.s, r.i, r.c, r.c + r.recent / 2);
   for (const r of db.prepare(`SELECT dst_section s, dst_id i, COUNT(DISTINCT ch) c FROM refs
       WHERE src_section = ? AND src_id = ? AND ch <= ? AND op = 'add' GROUP BY dst_section, dst_id`).all(section, id, n)) add(r.s, r.i, 0, r.c);
   for (const r of db.prepare(`SELECT src_section s, src_id i, COUNT(DISTINCT ch) c FROM refs
@@ -344,7 +366,7 @@ export function entityOverview(db, section, id, n, { since = null } = {}) {
     infobox: { ...infobox, affiliations, former_affiliations },
     current_condition: facts.current_condition ? currentCondition(facts.current_condition, n) : null,
     fields,
-    chapters: chapterRows.map(r => ({ ch: r.ch, title: r.title, count: r.n_facts, headline: headlineAt.get(r.ch) ?? null })),
+    chapters_total: chapterRows.length, // the list itself: /api/entity/:s/:id/chapters (PLAN B2.1)
     related: { total: related.length, items: related.slice(0, TOP_LINKS) },
     backlinks: { total: sources.length, items: backlinks },
     recent: { from: recentFrom, total: chapterRows.filter(r => r.ch > recentFrom).length, items: recent },
@@ -387,6 +409,24 @@ export function chapterLines(db, n) {
   };
 }
 
+// ---- /api/entity/:s/:id/chapters ------------------------------------------------------------
+
+// The chapters an entity appears in through n, newest first, paged: number, title, facts recorded
+// there (0 for a chapter that only names it) and the entity's headline in that chapter.
+export function entityChapters(db, section, id, n, { offset = 0, limit = 50 } = {}) {
+  if (!SECTION_BY_KEY[section]) throw new ApiError(404, 'unknown section');
+  const total = db.prepare('SELECT COUNT(*) c FROM entity_chapters WHERE section = ? AND id = ? AND ch <= ?').get(section, id, n).c;
+  if (!total) return null;
+  const rows = db.prepare(`SELECT ec.ch, c.title, ec.n_facts FROM entity_chapters ec JOIN chapters c ON c.n = ec.ch
+    WHERE ec.section = ? AND ec.id = ? AND ec.ch <= ? ORDER BY ec.ch DESC LIMIT ? OFFSET ?`).all(section, id, n, limit, offset);
+  const headlines = new Map();
+  if (rows.length) {
+    for (const r of db.prepare(`SELECT ch, value FROM facts WHERE section = ? AND entity_id = ? AND field = 'headline' AND ch <= ? AND ch >= ? ORDER BY ch, ord`)
+      .all(section, id, rows[0].ch, rows.at(-1).ch)) headlines.set(r.ch, r.value);
+  }
+  return { section, id, ch: n, total, offset, limit, items: rows.map(r => ({ ch: r.ch, title: r.title, count: r.n_facts, headline: headlines.get(r.ch) ?? null })) };
+}
+
 // ---- /api/entity/:s/:id/facts ---------------------------------------------------------------
 
 // One field of one entity, newest first, paged; `from`/`to` bound the chapters.
@@ -426,13 +466,19 @@ const TRACKED_CHANGES = ['name', 'true_name', 'title', 'kind', 'role', 'status',
 // and headlines. Long lists are capped at `limit`; totals say how many there were.
 export function since(db, from, n, { limit = 100 } = {}) {
   const a = Math.max(0, Math.min(from, n));
-  const firsts = db.prepare('SELECT section, id, MIN(ch) first FROM entity_chapters WHERE ch <= ? GROUP BY section, id').all(n);
+  // entities first seen in (a, n], with their latest importance through n (one indexed lookup each)
+  const firsts = db.prepare('SELECT section, id, MIN(ch) first FROM entity_chapters WHERE ch <= ? GROUP BY section, id HAVING MIN(ch) > ?').all(n, a);
   const importance = new Map();
-  for (const r of db.prepare("SELECT section, entity_id, value, ch FROM facts WHERE field = 'importance' AND ch <= ? ORDER BY ch, ord").all(n)) {
-    importance.set(`${r.section}:${r.entity_id}`, r.value);
+  if (firsts.length) {
+    for (const r of db.prepare(`SELECT json_extract(j.value, '$[0]') section, json_extract(j.value, '$[1]') id, (
+        SELECT x.value FROM facts x WHERE x.section = json_extract(j.value, '$[0]') AND x.entity_id = json_extract(j.value, '$[1]')
+          AND x.field = 'importance' AND x.ch <= ? ORDER BY x.ch DESC, x.ord DESC, x.id DESC LIMIT 1) value
+        FROM json_each(?) j`).all(n, JSON.stringify(firsts.map(r => [r.section, r.id])))) {
+      if (r.value != null) importance.set(`${r.section}:${r.id}`, r.value);
+    }
   }
 
-  const fresh = firsts.filter(r => r.first > a)
+  const fresh = firsts
     .map(r => ({ section: r.section, id: r.id, importance: importance.get(`${r.section}:${r.id}`) ?? null, first_ch: r.first }))
     .sort((x, y) => rank(IMPORTANCE, x.importance) - rank(IMPORTANCE, y.importance) || x.first_ch - y.first_ch);
   // changes to entities that already existed at `from`

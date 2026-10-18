@@ -114,7 +114,7 @@ function infoboxHtml(o, sec) {
     ${rows.length ? `<dl class="info-list">${rows.join('')}</dl><hr>` : ''}
     <div class="info-stats">
       <div><span class="big">ch ${o.first_ch}</span><span class="muted">first appears</span></div>
-      <div><span class="big">${o.chapters.length}</span><span class="muted">${o.chapters.length === 1 ? 'chapter' : 'chapters'} with ${sec.key === 'characters' ? 'this character' : 'this entry'}</span></div>
+      <div><span class="big">${o.chapters_total}</span><span class="muted">${o.chapters_total === 1 ? 'chapter' : 'chapters'} with ${sec.key === 'characters' ? 'this character' : 'this entry'}</span></div>
     </div>
     ${origins.length ? `<hr><div class="info-origins"><h3>Origins</h3>${origins.map(f => `<a href="#" data-open-field="origins">${esc(fieldLabel(sec, f.key).replace(/^Origin — /, ''))} · ${plural(f.count, 'fact')}</a>`).join('')}</div>` : ''}
     ${STATIC ? '' : `<hr>${link(`#/report?from=${encodeURIComponent(where)}`, 'Report an error on this page', 'muted')}`}
@@ -240,9 +240,22 @@ async function loadCard(o, sec, card, body, range, { more = false } = {}) {
 
 // ---- Chapter by chapter tab --------------------------------------------------------------------
 
-function timelinePanel(o, { openChapters, visible }) {
+// The tab's rows come from /api/entity/…/chapters, newest first, TIMELINE_PAGE at a time (PLAN B2.1:
+// the overview no longer carries the whole list). Load until `visible` rows are there.
+async function ensureTimeline(o, state) {
+  const t = state.timeline ??= { items: [], total: o.chapters_total };
+  while (t.items.length < Math.min(t.total, state.visible)) {
+    const page = await api(`/api/entity/${o.section}/${encodeURIComponent(o.id)}/chapters?ch=${store.ch}&offset=${t.items.length}&limit=${TIMELINE_PAGE}`);
+    t.total = page.total;
+    t.items.push(...page.items);
+    if (!page.items.length) break;
+  }
+  return t;
+}
+
+function timelinePanel(o, { openChapters, visible, timeline }) {
   const volumeOf = new Map(store.chapters.map(c => [c.n, c.volume]));
-  const rows = [...o.chapters].reverse();
+  const rows = timeline.items;
   let html = '', currentVolume;
   rows.forEach((c, i) => {
     const vol = volumeOf.get(c.ch) ?? 'Earlier';
@@ -255,7 +268,7 @@ function timelinePanel(o, { openChapters, visible }) {
       <div class="ch-body" id="ch-body-${c.ch}"${open ? '' : ' hidden'}></div>
     </div>`;
   });
-  const left = rows.length - visible;
+  const left = timeline.total - visible;
   return `<p class="muted">Newest first · open a chapter to read its facts</p>${html}
     ${left > 0 ? `<button type="button" class="btn btn-outline" id="timeline-more">Show ${Math.min(left, TIMELINE_PAGE)} earlier chapters</button>` : ''}`;
 }
@@ -307,7 +320,7 @@ export async function entity(key, id, params) {
           ${tabsHtml('ent-tabs', [
             { key: 'overview', label: 'Overview' },
             { key: 'facts', label: 'All facts', short: 'Facts', count: o.facts_total.toLocaleString('en-US') },
-            { key: 'timeline', label: 'Chapter by chapter', short: 'Timeline', count: o.chapters.length },
+            { key: 'timeline', label: 'Chapter by chapter', short: 'Timeline', count: o.chapters_total },
           ], tab, 'Entity views')}
         </div>
         ${infoboxHtml(o, sec)}
@@ -324,8 +337,16 @@ export async function entity(key, id, params) {
           const body = state.open && $(`#card-${state.open}`, panel);
           if (body) loadCard(o, sec, cards.find(c => c.key === state.open), body, state.range);
         } else {
-          panel.innerHTML = timelinePanel(o, state);
-          for (const c of state.openChapters) { const b = $(`#ch-body-${c}`, panel); if (b && !b.hidden) loadChapter(o, sec, c, b); }
+          panel.innerHTML = '<p class="muted">Loading chapters…</p>';
+          ensureTimeline(o, state).then((t) => {
+            if (current !== 'timeline') return;
+            if (state.openNewest) { // "See all changes": the newest chapters since the last read one, open
+              state.openChapters = new Set(t.items.filter(c => c.ch > o.since.from).slice(0, state.openNewest).map(c => c.ch));
+              state.openNewest = 0;
+            }
+            panel.innerHTML = timelinePanel(o, state);
+            for (const c of state.openChapters) { const b = $(`#ch-body-${c}`, panel); if (b && !b.hidden) loadChapter(o, sec, c, b); }
+          });
         }
       };
       const select = initTabs(root, 'ent-tabs', renderPanel);
@@ -385,11 +406,20 @@ export async function entity(key, id, params) {
           return;
         }
         if (t.closest('#timeline-more')) {
+          const button = t.closest('#timeline-more');
+          button.disabled = true;
           state.visible += TIMELINE_PAGE;
-          for (const el of $$('[data-row][hidden]', root)) if (Number(el.dataset.row) < state.visible) el.hidden = false;
-          const left = o.chapters.length - state.visible;
-          if (left > 0) t.closest('#timeline-more').textContent = `Show ${Math.min(left, TIMELINE_PAGE)} earlier chapters`;
-          else t.closest('#timeline-more').remove();
+          const tl = await ensureTimeline(o, state);
+          const panel = $('#ent-tabs-panel', root);
+          if (tl.items.length > panel.querySelectorAll('.ch-row').length) {
+            // new rows arrived: redraw, keeping the open chapters
+            panel.innerHTML = timelinePanel(o, state);
+            for (const c of state.openChapters) { const b = $(`#ch-body-${c}`, panel); if (b && !b.hidden) loadChapter(o, sec, c, b); }
+          } else {
+            for (const el of $$('[data-row][hidden]', root)) if (Number(el.dataset.row) < state.visible) el.hidden = false;
+            const left = tl.total - state.visible;
+            if (left > 0) { button.textContent = `Show ${Math.min(left, TIMELINE_PAGE)} earlier chapters`; button.disabled = false; } else button.remove();
+          }
           return;
         }
         const details = t.closest('.details-toggle');
@@ -414,9 +444,8 @@ export async function entity(key, id, params) {
         }
         if (t.closest('#recap-all')) {
           // show every chapter since the last read one, the newest three open
-          const inRange = o.chapters.filter(c => c.ch > o.since.from).map(c => c.ch).sort((a, b) => b - a);
-          state.visible = Math.max(state.visible, inRange.length);
-          state.openChapters = new Set(inRange.slice(0, 3));
+          state.visible = Math.max(state.visible, o.since.chapters);
+          state.openNewest = Math.min(3, o.since.chapters);
           select('timeline', { focus: true });
         }
       });
