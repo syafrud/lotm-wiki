@@ -5,15 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="wiki-mode" content="static">
   <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-P0aKt8TfVEdUlLUulX388/3kEvXCwNjaCkAjj/aI+N4='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>Mysteries Wiki</title>
+  <meta name="description" content="A spoiler-aware reading companion for Lord of the Mysteries: pick the chapter you have read, and the wiki shows only what is known up to it.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Mysteries Wiki">
+  <meta property="og:description" content="A spoiler-aware reading companion: only what is known up to the chapter you have read.">
+  <meta name="theme-color" content="#8b1e2d">
+  <link rel="icon" href="assets/20261018T232544303cco/favicon.svg" type="image/svg+xml">
   <script>
     // apply the saved theme before the first paint (no flash)
     try { var t = localStorage.getItem('wiki.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&amp;family=Source+Sans+3:wght@400;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
-  <link rel="stylesheet" href="style.css?v=20261018T133320233vky">
+  <link rel="preload" href="assets/20261018T232544303cco/fonts/source-sans-3-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/20261018T232544303cco/style.css">
 </head>
 <body>
   <button class="skip-link" id="skip-link" type="button">Skip to content</button>
@@ -74,6 +79,6 @@
     <main class="content" id="content"><p class="muted">Loading…</p></main>
   </div>
 
-  <script type="module" src="js/main.js?v=20261018T133320233vky"></script>
+  <script type="module" src="assets/20261018T232544303cco/js/main.js"></script>
 </body>
 </html>

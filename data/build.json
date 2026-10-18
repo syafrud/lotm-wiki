@@ -1,12 +1,12 @@
 {
- "id": "20261018T133320233vky",
- "built_at": "2026-10-18T13:33:21.330Z",
+ "id": "20261018T232544303cco",
+ "built_at": "2026-10-18T23:25:45.099Z",
  "chapters": 321,
  "facts": 43224,
  "format": 4,
- "file": "wiki-20261018T133320233vky.db.gz",
+ "file": "wiki-20261018T232544303cco.db.gz",
  "db_bytes": 9695232,
- "gz_bytes": 3138581,
+ "gz_bytes": 3138582,
  "indexes": [
   "CREATE INDEX chapter_notes_ch ON chapter_notes(ch)",
   "CREATE INDEX entity_chapters_ch ON entity_chapters(ch)",
