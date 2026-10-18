@@ -1,6 +1,7 @@
 // #/ — the reading chapter: headline, summary, notes, and one line per entity it introduced or
-// updated, grouped by section.
-import { esc } from '../util.js';
+// updated, grouped by section. Wide screens put the notes beside the summary and the changes in
+// columns; phones keep the order summary → changes → notes.
+import { esc, chapterTitle } from '../util.js';
 import { api } from '../api.js';
 import { store, sectionTitle } from '../store.js';
 import { entityLink, link, notesList } from '../components/ui.js';
@@ -27,17 +28,26 @@ export async function overview() {
     </section>`;
   }).join('');
   return {
-    title: `Chapter ${c.n}: ${c.title}`,
-    html: `
-      <h1 tabindex="-1">Chapter ${c.n}: ${esc(c.title)}</h1>
-      <p class="subtitle">${esc(c.volume)} · showing everything known through this chapter</p>
-      ${c.headline ? `<p class="lede">${esc(c.headline)}</p>` : ''}
-      <h2>Summary of events</h2>
-      <div class="summary">${paragraphs || '<p class="empty">No summary.</p>'}</div>
-      <h2>Introduced or updated in this chapter</h2>
-      ${sections || '<p class="empty">Nothing recorded for this chapter.</p>'}
-      <h2>Foreshadowing (this chapter)</h2>${notesList(d.foreshadowing, 'None noted.')}
-      <h2>Open questions (this chapter)</h2>${notesList(d.open_questions, 'None noted.')}
-      <p>${link('#/questions', `All open questions so far (${qs.total})`)} · ${link('#/since', 'What changed since you last read')}</p>`,
+    title: `Chapter ${c.n}: ${chapterTitle(c.title)}`,
+    html: `<div class="overview-page">
+      <header class="ov-head">
+        <h1 class="chapter-title" tabindex="-1">Chapter ${c.n}: ${esc(chapterTitle(c.title))}</h1>
+        <p class="subtitle">${esc(c.volume)} · showing everything known through this chapter</p>
+        ${c.headline ? `<p class="lede">${esc(c.headline)}</p>` : ''}
+      </header>
+      <section class="ov-summary">
+        <h2>Summary of events</h2>
+        <div class="summary">${paragraphs || '<p class="empty">No summary.</p>'}</div>
+      </section>
+      <aside class="ov-notes" aria-label="Notes on this chapter">
+        <h2>Foreshadowing (this chapter)</h2>${notesList(d.foreshadowing, 'None noted.')}
+        <h2>Open questions (this chapter)</h2>${notesList(d.open_questions, 'None noted.')}
+        <p>${link('#/questions', `All open questions so far (${qs.total})`)} · ${link('#/since', 'What changed since you last read')}</p>
+      </aside>
+      <section class="ov-changes">
+        <h2>Introduced or updated in this chapter</h2>
+        <div class="ov-change-cols">${sections || '<p class="empty">Nothing recorded for this chapter.</p>'}</div>
+      </section>
+    </div>`,
   };
 }

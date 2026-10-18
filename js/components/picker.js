@@ -1,7 +1,7 @@
 // "Read up to" picker: volume + chapter selects and the ‹ › buttons.
 // The server withholds titles after ch + 1 and the names of volumes not started yet, so the list
 // is refetched whenever the reading chapter changes.
-import { $, esc, storage } from '../util.js';
+import { $, esc, storage, chapterTitle } from '../util.js';
 import { api } from '../api.js';
 import { store, rememberChapter, noteMove } from '../store.js';
 
@@ -40,7 +40,7 @@ export function syncPickers() {
   volSelect.innerHTML = vols.map(v => `<option value="${esc(v.volume)}">${esc(v.volume)}</option>`).join('');
   volSelect.value = cur?.volume ?? LATER;
   const v = vols.find(x => x.volume === volSelect.value) ?? vols[0];
-  select.innerHTML = (v?.chapters ?? []).map(c => `<option value="${c.n}">Ch ${c.n}${c.title ? ': ' + esc(c.title) : ''}</option>`).join('');
+  select.innerHTML = (v?.chapters ?? []).map(c => `<option value="${c.n}">Ch ${c.n}${c.title ? ': ' + esc(chapterTitle(c.title)) : ''}</option>`).join('');
   select.value = String(store.ch);
   const i = store.chapters.findIndex(c => c.n === store.ch);
   prev.disabled = i <= 0;

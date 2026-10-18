@@ -8,6 +8,21 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp
 // "sealed_artifact" -> "Sealed artifact"
 export const enumLabel = (v) => { const s = String(v ?? '').replace(/_/g, ' '); return s ? s[0].toUpperCase() + s.slice(1) : s; };
 
+// Chapter titles are stored as printed, in capitals ("THE SEER’S SUGGESTION"); show them in title
+// case ("The Seer’s Suggestion"). Small words stay lower case inside the title; a title that
+// already has lower-case letters is left as it is.
+const SMALL_WORDS = new Set('a an and as at but by for from in into nor of on onto or over per the to via vs with'.split(' '));
+export function chapterTitle(title) {
+  const s = String(title ?? '');
+  if (!s || /[a-z]/.test(s)) return s;
+  const words = s.toLowerCase().split(' ');
+  return words.map((w, i) => {
+    const core = w.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '');
+    if (i > 0 && i < words.length - 1 && SMALL_WORDS.has(core)) return w;
+    return w.replace(/^([^a-z0-9]*)([a-z])/, (m, lead, c) => lead + c.toUpperCase()).replace(/-([a-z])/g, (m, c) => '-' + c.toUpperCase());
+  }).join(' ');
+}
+
 // Search snippets mark matches with \u0001 … \u0002; escape first, then mark.
 export const markSnippet = (s) => esc(s).replace(/\u0001/g, '<mark>').replace(/\u0002/g, '</mark>');
 

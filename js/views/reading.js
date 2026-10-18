@@ -1,6 +1,6 @@
 // #/questions — every open question so far, newest first, grouped by volume, paged.
 // #/since?from=A — what changed in chapters (A, N] across the wiki ("Since you last read").
-import { $, esc, enumLabel } from '../util.js';
+import { $, esc, enumLabel, chapterTitle } from '../util.js';
 import { api } from '../api.js';
 import { store, sectionTitle } from '../store.js';
 import { chip, entityLink, link } from '../components/ui.js';
@@ -67,7 +67,7 @@ export async function since(params) {
   const value = (c) => ['status', 'role', 'importance', 'kind'].includes(c.field) ? enumLabel(c.value) : c.value.replace(/^[a-z_]+:/, '');
   const changesHtml = d.changes.items.map(c => `<li><span class="change-name">${entityLink(c.section, c.id, c.heading)}</span>
     <span class="change-line">${esc(label(c.field))}: ${esc(value(c))}</span> ${chip(c.ch)}</li>`).join('');
-  const chaptersHtml = d.chapters.slice().reverse().map(c => `<li><a href="#/?ch=${c.n}">Chapter ${c.n}: ${esc(c.title)}</a>${c.headline ? ` — ${esc(c.headline)}` : ''}</li>`).join('');
+  const chaptersHtml = d.chapters.slice().reverse().map(c => `<li><a href="#/?ch=${c.n}">Chapter ${c.n}: ${esc(chapterTitle(c.title))}</a>${c.headline ? ` — ${esc(c.headline)}` : ''}</li>`).join('');
   const capped = (x) => x.total > x.items.length ? ` <span class="muted">(showing ${x.items.length} of ${x.total})</span>` : '';
   return {
     title: 'Since you last read',

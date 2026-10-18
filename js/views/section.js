@@ -117,6 +117,10 @@ export async function section(key, params) {
       </div>
       <span class="showing" role="status">Showing ${data.total} of ${data.all}</span>
     </div>`;
+  // phones: the toolbar folds behind one button that says what is chosen
+  const toggleText = () => `${f.imp.map(i => enumLabel(i)).join(', ')} · ${SORTS.find(([s2]) => s2 === f.sort)[1]}${f.view === 'cards' ? ' · Cards' : ''} · ${data.total} of ${data.all}`;
+  const toggle = () => isTree ? '' : `<button type="button" class="filters-toggle" aria-expanded="false" aria-controls="section-toolbar">
+      <span class="filters-label">Filters</span> <span class="filters-summary">${esc(toggleText())}</span> <span class="chev" aria-hidden="true">▾</span></button>`;
 
   return {
     title: sectionTitle(key),
@@ -129,7 +133,8 @@ export async function section(key, params) {
         <label class="name-filter"><span class="sr-only">Filter ${esc(sectionTitle(key).toLowerCase())} by name</span>
           <input type="search" id="name-filter" placeholder="Filter by name" value="${esc(f.q)}" autocomplete="off"></label>
       </div>
-      <div id="section-toolbar">${toolbar()}</div>
+      ${toggle()}
+      <div id="section-toolbar" data-open="false">${toolbar()}</div>
       <div id="section-results">${results()}</div>
       <p class="muted">${link('#/since', 'What changed since you last read')}</p>
     </div>`,
@@ -143,6 +148,8 @@ export async function section(key, params) {
         data = await fetchData();
         rows = data.rows;
         $('#section-toolbar', page).innerHTML = toolbar();
+        const summary = $('.filters-summary', page);
+        if (summary) summary.textContent = toggleText();
         $('#section-results', page).innerHTML = results();
         if (keep) $(keep, page)?.focus();
       };
@@ -153,6 +160,13 @@ export async function section(key, params) {
       });
       page.addEventListener('click', async (ev) => {
         const t = ev.target;
+        const fold = t.closest('.filters-toggle');
+        if (fold) {
+          const open = fold.getAttribute('aria-expanded') !== 'true';
+          fold.setAttribute('aria-expanded', String(open));
+          $('#section-toolbar', page).dataset.open = String(open);
+          return;
+        }
         const imp = t.closest('[data-imp]');
         if (imp) {
           const i = imp.dataset.imp;

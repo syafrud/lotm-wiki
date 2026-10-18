@@ -555,3 +555,80 @@ kbd { font-family: var(--mono); font-size: 12px; padding: 1px 6px; border: 1px s
 .db-progress { position: fixed; inset: 0 0 auto 0; z-index: 200; height: 28px; background: var(--bg-elev); border-bottom: 1px solid var(--line); }
 .db-progress-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent-soft); transition: width .2s; }
 .db-progress-text { position: relative; display: block; padding: 4px 12px; font-size: 14px; color: var(--fg); }
+
+/* ---- B1 (PLAN v3) ---- */
+/* B1.4: table cells wrap between words only ("Dead", not "Dea d"); status never wraps */
+.rows-table th, .rows-table td { overflow-wrap: normal; word-break: normal; }
+.rows-table tbody td:nth-child(3), .rows-table thead th:nth-child(3) { white-space: nowrap; }
+/* B1.2: an older "Right now" field */
+.now-card.stale { background: var(--bg); }
+.as-of { font-size: 13px; color: var(--muted); white-space: nowrap; }
+/* B1.7: the chapter overview heading matches the entity heading */
+.chapter-title { font-family: var(--serif); font-weight: 600; font-size: 34px; line-height: 1.2; }
+/* B1.6: volume page in groups of 25 */
+.group-jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+.ch-group { border-top: 1px solid var(--line); }
+.ch-group > summary { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-weight: 600; list-style-position: inside; }
+.ch-group > summary .muted { font-weight: 400; }
+.ch-group[open] > summary { margin-bottom: 2px; }
+/* B1.5: filters fold behind one button on phones */
+.filters-toggle { display: none; }
+@media (max-width: 760px) {
+  .chapter-title { font-size: 26px; }
+  .filters-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin: 0 0 10px; padding: 8px 12px;
+    font: inherit; text-align: left; color: var(--fg); background: var(--bg-elev); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+  .filters-label { font-weight: 600; }
+  .filters-summary { flex: 1 1 auto; min-width: 0; color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .filters-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+  #section-toolbar[data-open="false"] .toolbar { display: none; }
+  .section-head { margin-bottom: 10px; }
+  .section-head .name-filter, .section-head .name-filter input { width: 100%; }
+}
+/* B1.9 responsive: every width from 320 px phones to 2560 px monitors */
+.tabs { overflow-y: hidden; }
+.topbar .row-2 { flex-wrap: wrap; }
+@media (min-width: 761px) and (max-width: 1100px) {
+  .chapter-picker select { max-width: 200px; }
+  .search { flex: 1 1 220px; }
+}
+/* wide screens: the content grows with the screen (left-aligned next to the sidebar) instead of
+   leaving a band of empty space; pages lay out in columns there */
+@media (min-width: 1400px) { .content { max-width: 1240px; } }
+@media (min-width: 1700px) { .content { max-width: 1480px; } }
+@media (min-width: 2200px) { .content { max-width: 1840px; } }
+
+/* chapter overview: phones read summary → changes → notes; wide screens put the notes beside the
+   summary and the changes in up to three columns */
+.overview-page { display: flex; flex-direction: column; }
+.ov-summary { order: 1; }
+.ov-changes { order: 2; }
+.ov-notes { order: 3; }
+.ov-change-cols .changes { break-inside: avoid; }
+.ov-change-cols .changes:first-child h3 { margin-top: 4px; }
+@media (min-width: 1200px) {
+  .overview-page { display: grid; grid-template-columns: minmax(0, 74ch) minmax(300px, 1fr); column-gap: 40px; align-items: start; }
+  .ov-head { grid-column: 1 / -1; grid-row: 1; }
+  .ov-summary { grid-column: 1; grid-row: 2; }
+  .ov-notes { grid-column: 2; grid-row: 2; }
+  .ov-changes { grid-column: 1 / -1; grid-row: 3; }
+  .ov-summary .summary { max-width: none; }
+  .ov-change-cols { columns: 440px 3; column-gap: 40px; }
+}
+@media (min-width: 761px) and (max-width: 900px) { .rows-table .bar { display: none; } }
+.since-title { text-transform: none; letter-spacing: 0; }
+.volume-list .since-title { font-size: 15px; font-weight: 600; color: var(--fg); }
+.ch-group > summary { list-style: none; }
+.ch-group > summary::-webkit-details-marker { display: none; }
+.ch-group > summary::before { content: '▸'; color: var(--accent); width: 14px; display: inline-block; }
+.ch-group[open] > summary::before { content: '▾'; }
+.filters-label, .filters-toggle .chev { white-space: nowrap; flex: 0 0 auto; }
+/* entity Overview tab on wide screens: the story and "Since ch X" side by side */
+@media (min-width: 1500px) {
+  .ov-blocks { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 40px; align-items: start; }
+  .ov-blocks > .block { grid-column: 1 / -1; }
+  .ov-blocks > .block-story { grid-column: 1; }
+  .ov-blocks > .block-since { grid-column: 2; }
+  .ov-blocks > .block-story:only-of-type, .ov-blocks > .block-since:only-of-type { grid-column: 1 / -1; }
+  .ov-blocks .now-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1200px) { .ov-change-cols .change-list li { padding: 6px 0; row-gap: 2px; } }

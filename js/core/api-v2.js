@@ -21,6 +21,24 @@ export class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
+// A fact whose whole value is a reference ("items_artifacts:rosago_characteristic") gets
+// `ref: {section, id, heading}` so the page can link it; one whose target is not known through n
+// is dropped, like any other later information.
+const REF_VALUE = /^([a-z_]+):([a-z0-9_]+)$/;
+const refOf = (value) => { const m = REF_VALUE.exec(String(value)); return m && SECTION_BY_KEY[m[1]] ? { section: m[1], id: m[2] } : null; };
+const refKeysOf = (list) => list.map(f => refOf(f.value)).filter(Boolean).map(r => `${r.section}:${r.id}`);
+function linkRefs(ids, list, n) {
+  ids.prefetch(refKeysOf(list));
+  const out = [];
+  for (const f of list) {
+    const r = refOf(f.value);
+    if (!r) { out.push(f); continue; }
+    const heading = headingAt(ids, r.section, r.id, n);
+    if (heading) out.push({ ...f, ref: { ...r, heading } });
+  }
+  return out;
+}
+
 // ---- /api/meta ------------------------------------------------------------------------------
 
 // Build id, chapter count and the volumes that have started by n (with their end once finished).
@@ -189,19 +207,23 @@ function loadEntity(db, section, id, n) {
 const RECENT_DEFAULT = 10;     // "Since ch X" covers the last 10 chapters when there is no summary
 const RECENT_MAX = 30;
 const CONNECTIONS_TOP = 9;
+const CONNECTIONS_RECENT = 50;
 const RECAP_FIELDS = ['status', 'sequence_number', 'title', 'true_name', 'name', 'role'];
 
 // One line for what chapter ch said about the entity: its headline, else its first bio fact,
-// else its first fact outside the header fields.
+// else (timeline entries) its event, else its first fact outside the header fields — never a bare
+// date or a reference id.
+const NOT_A_LINE = new Set(['date']);
 function chapterLine(facts, ch) {
   const pick = (field) => (facts[field] ?? []).find(f => f.ch === ch && f.op !== 'remove');
   let f = pick('headline'), source = 'headline';
   if (!f) { f = pick('bio'); source = 'bio'; }
+  if (!f) { f = pick('event'); source = 'event'; }
   if (!f) {
     source = 'fact';
     for (const [field, list] of Object.entries(facts)) {
-      if (HEADER_FIELDS.has(field)) continue;
-      f = list.find(x => x.ch === ch && x.op !== 'remove');
+      if (HEADER_FIELDS.has(field) || NOT_A_LINE.has(field)) continue;
+      f = list.find(x => x.ch === ch && x.op !== 'remove' && !refOf(x.value));
       if (f) break;
     }
   }
@@ -227,7 +249,7 @@ export function entityOverview(db, section, id, n, { since = null } = {}) {
     const list = facts[field];
     if (!list?.length || HEADER_FIELDS.has(field)) continue;
     const shown = field === 'current_condition' ? currentCondition(list, n) : [...list].reverse().slice(0, LATEST_PER_FIELD);
-    fields.push({ key: field, count: list.length, latest: shown });
+    fields.push({ key: field, count: list.length, latest: linkRefs(ids, shown, n) });
   }
 
   const related = resolveRefs(ids, section, active.related, n).filter(r => !(r.section === section && r.id === id));
@@ -259,21 +281,32 @@ export function entityOverview(db, section, id, n, { since = null } = {}) {
   const recent = chapterRows.filter(r => r.ch > recentFrom).reverse().slice(0, RECENT_MAX)
     .map(r => ({ ch: r.ch, title: r.title, ...(chapterLine(facts, r.ch) ?? { text: '', source: null }) }));
 
-  // most connected: entities linked either way, by the number of chapters that link them
-  const linkCount = new Map();
-  const bump = (sec2, id2, c) => { if (sec2 === section && id2 === id) return; const k = `${sec2}:${id2}`; linkCount.set(k, (linkCount.get(k) ?? 0) + c); };
+  // most connected (PLAN B1.3): entities that share the most chapters with this one — every
+  // chapter both appear in (facts or mentions), each of the last CONNECTIONS_RECENT chapters
+  // counting 1.5 — plus the chapters that link them by reference. A character's list keeps to people.
+  const score = new Map(); // "section:id" -> { together, score }
+  const add = (sec2, id2, together, points) => {
+    if (sec2 === section && id2 === id) return;
+    if (section === 'characters' && sec2 !== 'characters') return;
+    const k = `${sec2}:${id2}`;
+    const s = score.get(k) ?? score.set(k, { together: 0, score: 0 }).get(k);
+    s.together += together; s.score += points;
+  };
+  for (const r of db.prepare(`SELECT b.section s, b.id i, COUNT(*) c, SUM(b.ch > ?) recent
+      FROM entity_chapters a JOIN entity_chapters b ON b.ch = a.ch AND NOT (b.section = a.section AND b.id = a.id)
+      WHERE a.section = ? AND a.id = ? AND a.ch <= ? GROUP BY b.section, b.id`).all(n - CONNECTIONS_RECENT, section, id, n)) add(r.s, r.i, r.c, r.c + r.recent / 2);
   for (const r of db.prepare(`SELECT dst_section s, dst_id i, COUNT(DISTINCT ch) c FROM refs
-      WHERE src_section = ? AND src_id = ? AND ch <= ? AND op = 'add' GROUP BY dst_section, dst_id`).all(section, id, n)) bump(r.s, r.i, r.c);
+      WHERE src_section = ? AND src_id = ? AND ch <= ? AND op = 'add' GROUP BY dst_section, dst_id`).all(section, id, n)) add(r.s, r.i, 0, r.c);
   for (const r of db.prepare(`SELECT src_section s, src_id i, COUNT(DISTINCT ch) c FROM refs
-      WHERE dst_section = ? AND dst_id = ? AND ch <= ? AND op = 'add' GROUP BY src_section, src_id`).all(section, id, n)) bump(r.s, r.i, r.c);
-  const ranked = [...linkCount].sort((a, b) => b[1] - a[1]);
+      WHERE dst_section = ? AND dst_id = ? AND ch <= ? AND op = 'add' GROUP BY src_section, src_id`).all(section, id, n)) add(r.s, r.i, 0, r.c);
+  const ranked = [...score].sort((a, b) => b[1].score - a[1].score || b[1].together - a[1].together || a[0].localeCompare(b[0]));
   ids.prefetch(ranked.slice(0, CONNECTIONS_TOP * 2).map(([k]) => k));
   const connections = [];
-  for (const [k, count] of ranked) {
+  for (const [k, s] of ranked) {
     if (connections.length >= CONNECTIONS_TOP) break;
     const [sec2, ...rest] = k.split(':');
     const heading = headingAt(ids, sec2, rest.join(':'), n);
-    if (heading) connections.push({ section: sec2, id: rest.join(':'), heading, name: latest(ids.get(sec2, rest.join(':'))?.name, n) ?? heading, count });
+    if (heading) connections.push({ section: sec2, id: rest.join(':'), heading, name: latest(ids.get(sec2, rest.join(':'))?.name, n) ?? heading, count: s.together });
   }
 
   // recap for a reader coming back from chapter `since`
@@ -315,7 +348,7 @@ export function entityOverview(db, section, id, n, { since = null } = {}) {
     related: { total: related.length, items: related.slice(0, TOP_LINKS) },
     backlinks: { total: sources.length, items: backlinks },
     recent: { from: recentFrom, total: chapterRows.filter(r => r.ch > recentFrom).length, items: recent },
-    connections: { total: linkCount.size, items: connections },
+    connections: { total: score.size, items: connections },
     since: recap,
   };
 }
@@ -363,7 +396,7 @@ export function entityFacts(db, section, id, n, { field, from = 1, to = n, offse
   if (!loaded) return null;
   const hi = Math.min(to, n);
   const list = (loaded.facts[field] ?? []).filter(f => f.ch >= from && f.ch <= hi).reverse();
-  return { section, id, field, ch: n, total: list.length, offset, limit, facts: list.slice(offset, offset + limit) };
+  return { section, id, field, ch: n, total: list.length, offset, limit, facts: linkRefs(identities(db, n), list.slice(offset, offset + limit), n) };
 }
 
 // ---- /api/entity/:s/:id/chapter/:c ----------------------------------------------------------
@@ -380,6 +413,8 @@ export function entityChapter(db, section, id, c, n) {
   for (const r of rows) (facts[r.field] ??= []).push(fact(r));
   const chapter = db.prepare('SELECT n, title, headline FROM chapters WHERE n = ?').get(c);
   const ids = identities(db, n);
+  ids.prefetch(refKeysOf(rows));
+  for (const [field, list] of Object.entries(facts)) facts[field] = linkRefs(ids, list, n);
   return { section, id, heading: headingAt(ids, section, id, n) ?? id, chapter: { n: chapter.n, title: chapter.title, headline: chapter.headline || null }, facts, ...(mentioned ? { mentioned } : {}) };
 }
 

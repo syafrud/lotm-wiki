@@ -3,7 +3,7 @@
 // "At chapter N" infobox. Everything comes from /api/entity/…?view=overview plus the paged
 // /facts and /chapter/:c endpoints. The open tab, field and range live in the hash (tab=, open=,
 // range=) so they survive a reload.
-import { $, $$, esc, enumLabel, storage } from '../util.js';
+import { $, $$, esc, enumLabel, storage, chapterTitle } from '../util.js';
 import { api } from '../api.js';
 import { store, sectionOf, sectionTitle, fieldLabel } from '../store.js';
 import { chip, link, entityLink, notFoundHtml } from '../components/ui.js';
@@ -19,6 +19,8 @@ const FACTS_PAGE = 25;
 const TIMELINE_FIRST = 10;
 const TIMELINE_PAGE = 50;
 const RANGE_STEP = 50;
+// "Right now" prefers fields updated in the last FRESH chapters; older ones go last, marked "as of ch X".
+const FRESH = 50;
 // "Right now" cards: the first four of these fields the entity has
 const RIGHT_NOW = {
   characters: ['current_condition', 'skills_knowledge', 'possessions', 'relationships_affiliations', 'physical_description', 'history'],
@@ -38,9 +40,12 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const chCell = (ch) => `<span class="ch-chip${ch === store.ch ? ' current' : ''}">ch ${ch}</span>`;
 const sectionLabel = (key) => enumLabel(String(sectionOf(key)?.label ?? key).toLowerCase().split(' /')[0]);
 
+// A fact's value as HTML: a link when it is a reference (the API resolves it for this chapter).
+const factValue = (f) => (f.ref ? entityLink(f.ref.section, f.ref.id, f.ref.heading) : esc(f.value));
+
 function factItem(f) {
   const ended = f.until != null || f.op === 'remove';
-  return `<li class="${ended ? 'ended' : ''}">${f.op === 'remove' ? 'No longer: ' : ''}${esc(f.value)} ${chCell(f.ch)}${f.until != null ? ` <span class="muted">until ch ${f.until}</span>` : ''}</li>`;
+  return `<li class="${ended ? 'ended' : ''}">${f.op === 'remove' ? 'No longer: ' : ''}${factValue(f)} ${chCell(f.ch)}${f.until != null ? ` <span class="muted">until ch ${f.until}</span>` : ''}</li>`;
 }
 
 // ---- header, recap, infobox ------------------------------------------------------------------
@@ -136,36 +141,39 @@ function infoChips(o, sec) {
 function overviewPanel(o, sec) {
   const parts = [];
   if (o.summary?.text) {
-    parts.push(`<section class="block"><div class="block-head"><h2>The story so far</h2><span class="muted">summary through ch ${o.summary.through_ch} · written by Claude</span></div>
+    parts.push(`<section class="block block-story"><div class="block-head"><h2>The story so far</h2><span class="muted">summary through ch ${o.summary.through_ch} · written by Claude</span></div>
       <div class="prose clamp" id="story-text">${o.summary.text.split(/\n\s*\n/).map(p => `<p>${esc(p)}</p>`).join('')}</div>
       <button type="button" class="read-more" aria-expanded="false" aria-controls="story-text">Read more</button></section>`);
   }
   const recent = o.recent.items.filter(r => r.text);
   if (recent.length) {
     const title = o.recent.from > 0 ? `Since ch ${o.recent.from}` : 'Chapter by chapter';
-    const row = (r, hidden) => `<li class="since-row"${hidden ? ' hidden' : ''}>${chCell(r.ch)}<div><span class="since-title">${esc(r.title)}</span><span>${esc(r.text)}</span></div></li>`;
+    const row = (r, hidden) => `<li class="since-row"${hidden ? ' hidden' : ''}>${chCell(r.ch)}<div><span class="since-title">${esc(chapterTitle(r.title))}</span><span>${esc(r.text)}</span></div></li>`;
     const rest = recent.slice(RECENT_FIRST);
-    parts.push(`<section class="block"><div class="block-head"><h2>${title}</h2><span class="muted">one line per chapter · newest first</span></div>
+    parts.push(`<section class="block block-since"><div class="block-head"><h2>${title}</h2><span class="muted">one line per chapter · newest first</span></div>
       <ol class="since-list">${recent.map((r, i) => row(r, i >= RECENT_FIRST)).join('')}</ol>
       ${rest.length ? `<button type="button" class="btn btn-outline" data-reveal="since-row">Show ch ${rest.at(-1).ch}–${rest[0].ch}</button>` : ''}</section>`);
   }
   const byKey = new Map(o.fields.map(f => [f.key, f]));
-  const cards = (RIGHT_NOW[sec.key] ?? []).map(k => byKey.get(k)).filter(Boolean).slice(0, 4);
+  const candidates = (RIGHT_NOW[sec.key] ?? []).map(k => byKey.get(k)).filter(f => f?.latest.length);
+  const isFresh = (f) => store.ch - f.latest[0].ch < FRESH;
+  const cards = [...candidates.filter(isFresh), ...candidates.filter(f => !isFresh(f))].slice(0, 4);
   if (cards.length) {
-    parts.push(`<section class="block"><h2>Right now</h2><div class="now-grid">${cards.map(f => {
+    parts.push(`<section class="block block-now"><h2>Right now</h2><div class="now-grid">${cards.map(f => {
       const first = f.latest[0];
-      const value = f.key === 'current_condition' ? f.latest.map(x => x.value).join(' ') : first.value;
+      const value = f.key === 'current_condition' ? f.latest.map(x => esc(x.value)).join(' ') : factValue(first);
       const earlier = f.count - (f.key === 'current_condition' ? f.latest.length : 1);
-      return `<div class="now-card"><div class="now-head"><h3>${esc(fieldLabel(sec, f.key))}</h3>${chCell(first.ch)}</div>
-        <p>${esc(value)}</p>${earlier > 0 ? `<a href="#" data-open-field="${f.key}">${earlier} earlier</a>` : ''}</div>`;
+      const stale = !isFresh(f);
+      return `<div class="now-card${stale ? ' stale' : ''}"><div class="now-head"><h3>${esc(fieldLabel(sec, f.key))}</h3>${stale ? `<span class="as-of">as of ch ${first.ch}</span>` : chCell(first.ch)}</div>
+        <p>${value}</p>${earlier > 0 ? `<a href="#" data-open-field="${f.key}">${earlier} earlier</a>` : ''}</div>`;
     }).join('')}</div></section>`);
   }
   if (o.connections.items.length) {
     const all = [...o.related.items, ...o.backlinks.items].filter((r, i, a) => a.findIndex(x => x.section === r.section && x.id === r.id) === i);
     const extra = all.filter(r => !o.connections.items.some(c => c.section === r.section && c.id === r.id));
-    parts.push(`<section class="block"><h2>Most connected</h2><div class="links">${o.connections.items.map(c =>
-      `<span class="linkchip" title="${esc(c.heading)} · linked in ${plural(c.count, 'chapter')}">${entityLink(c.section, c.id, c.name ?? c.heading)} <span class="muted">${esc(sectionLabel(c.section))}</span></span>`).join('')}
-      ${o.connections.total > o.connections.items.length && extra.length ? `<details class="more-links"><summary>All ${o.connections.total} connections</summary><div class="links">${extra.map(c =>
+    parts.push(`<section class="block block-links"><h2>Most connected</h2><div class="links">${o.connections.items.map(c =>
+      `<span class="linkchip" title="${esc(c.heading)} · together in ${plural(c.count, 'chapter')}">${entityLink(c.section, c.id, c.name ?? c.heading)} <span class="muted">${esc(sectionLabel(c.section))}</span></span>`).join('')}
+      ${extra.length ? `<details class="more-links"><summary>Other links (${extra.length})</summary><div class="links">${extra.map(c =>
         `<span class="linkchip">${entityLink(c.section, c.id, c.heading)} <span class="muted">${esc(sectionLabel(c.section))}</span></span>`).join('')}</div></details>` : ''}</div></section>`);
   }
   if (!parts.length) {
@@ -173,7 +181,7 @@ function overviewPanel(o, sec) {
     parts.push(`<section class="block"><h2>What is known</h2>${o.fields.length ? `<dl class="facts">${o.fields.map(f =>
       `<dt>${esc(fieldLabel(sec, f.key))}</dt><dd><ul>${f.latest.map(factItem).join('')}</ul></dd>`).join('')}</dl>` : '<p class="empty">Nothing recorded yet.</p>'}</section>`);
   }
-  return parts.join('');
+  return `<div class="ov-blocks">${parts.join('')}</div>`;
 }
 
 // ---- All facts tab -----------------------------------------------------------------------------
@@ -241,7 +249,7 @@ function timelinePanel(o, { openChapters, visible }) {
     const open = openChapters.has(c.ch);
     html += `<div class="ch-row" data-row="${i}"${i >= visible ? ' hidden' : ''}>
       <button type="button" class="ch-toggle" data-ch="${c.ch}" aria-expanded="${open}" aria-controls="ch-body-${c.ch}">
-        <span class="ch-num">ch ${c.ch}</span><span class="ch-title">${esc(c.title)}</span><span class="muted">${plural(c.count, 'fact')}</span><span class="chev" aria-hidden="true">${open ? '−' : '+'}</span>
+        <span class="ch-num">ch ${c.ch}</span><span class="ch-title">${esc(chapterTitle(c.title))}</span><span class="muted">${plural(c.count, 'fact')}</span><span class="chev" aria-hidden="true">${open ? '−' : '+'}</span>
       </button>
       <div class="ch-body" id="ch-body-${c.ch}"${open ? '' : ' hidden'}></div>
     </div>`;
@@ -256,7 +264,7 @@ async function loadChapter(o, sec, c, body) {
   const d = await api(`/api/entity/${o.section}/${encodeURIComponent(o.id)}/chapter/${c}?ch=${store.ch}`);
   const skip = new Set(['name', 'kind', 'importance', 'related', 'affiliations']);
   const items = Object.entries(d.facts).filter(([f]) => !skip.has(f) || c === o.first_ch).flatMap(([f, list]) =>
-    list.map(x => `<li><span class="field">${esc(fieldLabel(sec, f))}:</span> ${x.op === 'remove' ? 'No longer: ' : ''}${esc(x.value)}</li>`));
+    list.map(x => `<li><span class="field">${esc(fieldLabel(sec, f))}:</span> ${x.op === 'remove' ? 'No longer: ' : ''}${factValue(x)}</li>`));
   body.innerHTML = items.length ? `<ul class="fact-list">${items.join('')}</ul>`
     : `<p class="empty">${d.mentioned ? 'Named in this chapter, with nothing new.' : 'Only links and identity details.'}</p>`;
   body.dataset.loaded = '1';
