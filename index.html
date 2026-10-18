@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="wiki-mode" content="static">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Mysteries Wiki</title>
+  <script>
+    // apply the saved theme before the first paint (no flash)
+    try { var t = localStorage.getItem('wiki.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&amp;family=Source+Sans+3:wght@400;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+  <link rel="stylesheet" href="style.css?v=20261018T1205405964lt">
+</head>
+<body>
+  <button class="skip-link" id="skip-link" type="button">Skip to content</button>
+  <header class="topbar">
+    <div class="row row-1">
+      <button id="nav-toggle" class="icon-btn nav-toggle" type="button" aria-label="Open sections" aria-controls="sidebar" aria-expanded="false">☰</button>
+      <a class="brand" href="#/">Mysteries Wiki</a>
+      <button id="reading-pill" class="reading-pill" type="button" aria-controls="chapter-sheet" aria-expanded="false">
+        <span class="muted">Reading</span> <strong id="reading-pill-ch">Ch 1</strong> <span aria-hidden="true">▾</span>
+      </button>
+      <button id="search-toggle" class="icon-btn search-toggle" type="button" aria-label="Search" aria-controls="search-form" aria-expanded="false">⌕</button>
+    </div>
+    <div class="row row-2">
+      <div class="chapter-picker" id="chapter-sheet" role="group" aria-labelledby="picker-label">
+        <div class="sheet-head">
+          <span class="sheet-title">Where are you in the story?</span>
+          <button id="sheet-close" class="icon-btn" type="button" aria-label="Close">×</button>
+        </div>
+        <label id="picker-label" for="volume-select">Read up to</label>
+        <select id="volume-select" aria-label="Volume"></select>
+        <select id="chapter-select" aria-label="Chapter"></select>
+        <button id="chapter-prev" type="button" title="Previous chapter (←)" aria-label="Previous chapter">‹</button>
+        <button id="chapter-next" type="button" title="Next chapter (→)" aria-label="Next chapter">›</button>
+        <button id="sheet-theme" class="btn btn-outline sheet-theme" type="button">Switch theme</button>
+      </div>
+      <form class="search" id="search-form" role="search">
+        <input id="search-input" type="search" placeholder="Search facts… ( / )" autocomplete="off" aria-label="Search facts">
+      </form>
+      <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle theme">◐</button>
+    </div>
+  </header>
+
+  <div class="modal" id="disclaimer" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="disclaimer-title">
+      <h2 id="disclaimer-title">Before you read</h2>
+      <div class="modal-body" id="disclaimer-text"></div>
+      <div class="modal-pick">
+        <label for="disclaimer-ch">Where are you in the story? I have read up to chapter</label>
+        <input id="disclaimer-ch" type="number" min="1" step="1" inputmode="numeric" aria-describedby="disclaimer-ch-hint">
+        <p class="hint" id="disclaimer-ch-hint">Nothing after this chapter will be shown. You can change it any time with “Read up to”.</p>
+      </div>
+      <div class="modal-actions">
+        <a class="modal-link needs-server" href="#/report" id="disclaimer-report">Report an error</a>
+        <button id="disclaimer-ok" class="btn" type="button">Start reading</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div id="nav-overlay" class="nav-overlay"></div>
+    <div id="sheet-overlay" class="sheet-overlay" hidden></div>
+    <nav class="sidebar" id="sidebar" aria-label="Sections"></nav>
+    <main class="content" id="content"><p class="muted">Loading…</p></main>
+  </div>
+
+  <script type="module" src="js/main.js?v=20261018T1205405964lt"></script>
+</body>
+</html>
