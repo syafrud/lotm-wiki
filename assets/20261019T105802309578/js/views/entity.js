@@ -10,7 +10,8 @@ import { chip, link, entityLink, notFoundHtml, diaryEntryHtml } from '../compone
 import { tabsHtml, initTabs } from '../components/tabs.js';
 import { replaceQuery } from '../router.js';
 import { volumeLabel } from '../components/picker.js';
-import { STATIC } from '../mode.js';
+import { REPORTS } from '../mode.js';
+import { reportCounts } from '../components/reports.js';
 
 const TABS = ['overview', 'entries', 'facts', 'timeline'];
 const ORIGIN_FIELDS = ['origin_zhou_mingrui', 'origin_klein_moretti'];
@@ -159,7 +160,7 @@ function infoboxHtml(o, sec) {
     ${aka.length ? `<div class="dossier-part"><h3>Known as</h3><ul class="aka-list">${aka.slice(0, 3).map(a => `<li>${esc(a)}</li>`).join('')}</ul>
       ${aka.length > 3 ? `<a href="#" data-open-field="aliases" class="dossier-more">+${aka.length - 3} ${aka.length - 3 === 1 ? 'name' : 'names'}</a>` : ''}</div>` : ''}
     ${origins.length ? `<div class="dossier-part info-origins"><h3>Origins</h3>${origins.map(f => `<a href="#" data-open-field="origins">${esc(fieldLabel(sec, f.key).replace(/^Origin — /, ''))} · ${plural(f.count, 'fact')}</a>`).join('')}</div>` : ''}
-    ${STATIC ? '' : `<div class="dossier-part">${link(`#/report?from=${encodeURIComponent(where)}`, 'Report an error on this page', 'muted')}</div>`}
+    ${!REPORTS ? '' : `<div class="dossier-part">${link(`#/report?from=${encodeURIComponent(where)}`, 'Report an error on this page', 'muted')}</div>`}
   </aside>`;
 }
 
@@ -395,6 +396,7 @@ export async function entity(key, id, params) {
       ${presenceHtml(o)}
       <div class="ent-body">
         <div class="ent-main">
+          <div id="ent-report-notice"></div>
           ${recapHtml(o)}
           ${tabsHtml('ent-tabs', [
             { key: 'overview', label: 'Overview' },
@@ -407,6 +409,17 @@ export async function entity(key, id, params) {
       </div>
     </article>`,
     mount(root) {
+      // readers' reports about this page, from chapters already read (the same "where" the Report link fills in)
+      if (REPORTS) {
+        const where = `${sectionTitle(sec.key)} › ${o.heading}`;
+        reportCounts(store.ch, where).then(({ page }) => {
+          const box = $('#ent-report-notice', root);
+          if (!page || !box?.isConnected) return;
+          box.outerHTML = `<p class="report-notice" role="note"><span class="kicker">Reader reports</span>
+            <span>${page === 1 ? 'A reader reported' : `${page} readers reported`} a problem on this page.</span>
+            ${link(`#/reports?where=${encodeURIComponent(where)}`, page === 1 ? 'Read it' : 'Read them')}</p>`;
+        });
+      }
       let current = tab;
       const renderPanel = (key, panel) => {
         current = key;

@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { store, sectionTitle } from '../store.js';
 import { link } from './ui.js';
 import { currentVolumeIndex } from '../views/volume.js';
-import { STATIC } from '../mode.js';
+import { REPORTS } from '../mode.js';
 
 const sidebar = $('#sidebar');
 import { SHORT } from '../store.js';
@@ -34,8 +34,8 @@ export async function renderSidebar(path) {
     ${item('#/since', 'Since you last read', path === '/since')}
     <div class="group">This wiki</div>
     ${item('#/about', 'About', path === '/about')}
-    ${STATIC ? '' : item('#/report', 'Report an error', path === '/report')}
-    ${STATIC ? '' : item('#/reports', 'Reports', path === '/reports')}`;
+    ${!REPORTS ? '' : item('#/report', 'Report an error', path === '/report')}
+    ${!REPORTS ? '' : item('#/reports', 'Reports', path === '/reports')}`;
 }
 
 // ---- mobile drawer ----

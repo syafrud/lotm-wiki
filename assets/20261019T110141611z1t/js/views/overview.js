@@ -2,7 +2,9 @@
 // ledger of what changed ("+" new or updated, "−" ended), the entities only named here as
 // "Appearing" chips, the diary pages read in it, and its notes. Phones read summary → changes →
 // appearing → notes.
-import { esc, chapterTitle, roman, volumeParts } from '../util.js';
+import { $, esc, chapterTitle, roman, volumeParts } from '../util.js';
+import { REPORTS } from '../mode.js';
+import { reportCounts } from '../components/reports.js';
 import { api } from '../api.js';
 import { store, sectionTitle, sectionOf, fieldLabel } from '../store.js';
 import { entityLink, link, notesList, diaryEntryHtml } from '../components/ui.js';
@@ -75,6 +77,7 @@ export async function overview() {
         <span class="kicker">${kicker}</span>
         <h1 class="chapter-title" tabindex="-1"><span class="sr-only">Chapter ${c.n}: </span>${esc(chapterTitle(c.title))}</h1>
         ${c.headline ? `<p class="lede">${esc(c.headline)}</p>` : ''}
+        <div id="ov-report-notice"></div>
       </header>
       <section class="ov-summary">
         <h2 class="sr-only">Summary of events</h2>
@@ -95,5 +98,16 @@ export async function overview() {
         <p class="ov-links">${link('#/questions', `All open questions so far (${qs.total})`)} · ${link('#/since', 'What changed since you last read')}</p>
       </aside>
     </div>`,
+    mount(root) {
+      // readers' reports sent from this chapter (never from later ones)
+      if (!REPORTS) return;
+      reportCounts(n).then(({ chapter }) => {
+        const box = $('#ov-report-notice', root);
+        if (!chapter || !box?.isConnected) return;
+        box.outerHTML = `<p class="report-notice" role="note"><span class="kicker">Reader reports</span>
+          <span>${chapter === 1 ? 'There is 1 report' : `There are ${chapter} reports`} from readers on this chapter.</span>
+          ${link('#/reports?here=1', chapter === 1 ? 'Read it' : 'Read them')}</p>`;
+      });
+    },
   };
 }

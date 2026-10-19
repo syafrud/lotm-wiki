@@ -1,5 +1,11 @@
 [
  {
+  "id": "2026-10-19T11:22Z",
+  "date": "2026-10-19",
+  "build": "20261019T110141611z1t",
+  "note": "You can now report mistakes from any page: use Report an error. Reports are public, but you only see the ones sent from chapters you have already read, and reports marked as spoilers stay hidden."
+ },
+ {
   "id": "2026-10-19T06:41Z",
   "date": "2026-10-19",
   "build": "20261019T063716331uaz",

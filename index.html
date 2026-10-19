@@ -5,21 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="wiki-mode" content="static">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-P0aKt8TfVEdUlLUulX388/3kEvXCwNjaCkAjj/aI+N4='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="wiki-reports-url" content="https://ycfueparxdugyyjvcozl.supabase.co">
+  <meta name="wiki-reports-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZnVlcGFyeGR1Z3l5anZjb3psIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDE0NTUsImV4cCI6MjEwNzk3NzQ1NX0.t96NGICqC01YH41xwhI9QwVcmR52i07XZ1TTpuWQ4zM">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-P0aKt8TfVEdUlLUulX388/3kEvXCwNjaCkAjj/aI+N4='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://ycfueparxdugyyjvcozl.supabase.co; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>Mysteries Wiki</title>
   <meta name="description" content="A spoiler-aware reading companion for Lord of the Mysteries: pick the chapter you have read, and the wiki shows only what is known up to it.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Mysteries Wiki">
   <meta property="og:description" content="A spoiler-aware reading companion: only what is known up to the chapter you have read.">
   <meta name="theme-color" content="#221c15">
-  <link rel="icon" href="assets/20261019T063716331uaz/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/20261019T110141611z1t/favicon.svg" type="image/svg+xml">
   <script>
     // apply the saved theme before the first paint (no flash)
     try { var t = localStorage.getItem('wiki.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
-  <link rel="preload" href="assets/20261019T063716331uaz/fonts/source-sans-3-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="assets/20261019T063716331uaz/fonts/im-fell-english-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/20261019T063716331uaz/style.css">
+  <link rel="preload" href="assets/20261019T110141611z1t/fonts/source-sans-3-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/20261019T110141611z1t/fonts/im-fell-english-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/20261019T110141611z1t/style.css">
 </head>
 <body>
   <button class="skip-link" id="skip-link" type="button">Skip to content</button>
@@ -91,7 +93,7 @@
         <p class="hint" id="disclaimer-ch-hint">Nothing after this chapter will be shown.</p>
       </div>
       <div class="modal-actions">
-        <a class="modal-link needs-server" href="#/report" id="disclaimer-report">Report an error</a>
+        <a class="modal-link needs-reports" href="#/report" id="disclaimer-report">Report an error</a>
         <button id="disclaimer-ok" class="btn btn-light" type="button">Start reading</button>
       </div>
     </div>
@@ -106,6 +108,6 @@
     <main class="content" id="content"><p class="muted">Loading…</p></main>
   </div>
 
-  <script type="module" src="assets/20261019T063716331uaz/js/main.js"></script>
+  <script type="module" src="assets/20261019T110141611z1t/js/main.js"></script>
 </body>
 </html>

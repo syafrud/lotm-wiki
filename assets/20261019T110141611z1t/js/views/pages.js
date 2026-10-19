@@ -1,13 +1,13 @@
 // #/about, #/report and #/reports.
 import { $, esc } from '../util.js';
-import { api } from '../api.js';
 import { store } from '../store.js';
 import { chip, link } from '../components/ui.js';
 import { DISCLAIMER_HTML, showDisclaimer, resetDisclaimer } from '../components/modal.js';
-import { STATIC } from '../mode.js';
+import { STATIC, REPORTS } from '../mode.js';
+import { sendReport, listReports } from '../components/reports.js';
 import { fetchUpdates, noteHtml } from '../components/updates.js';
 
-// The static site (GitHub Pages) has no server to send reports to.
+// A static site exported without a reports address has nowhere to send them.
 const noReports = (title) => ({
   title,
   html: `<h1 tabindex="-1">${esc(title)}</h1>
@@ -32,7 +32,8 @@ export function about() {
       <p>Use <strong>Read up to</strong> in the top bar to choose your volume and chapter. Facts are tagged
       with the chapter they come from, and nothing from a later chapter is shown.</p>
       <p>Keyboard: <kbd>←</kbd> / <kbd>→</kbd> previous / next chapter, <kbd>/</kbd> search.</p>
-      ${STATIC ? '<p class="muted">This is the read-only version of the wiki: the data is loaded once into your browser, and reports are off.</p>' : `<p>${link('#/report', 'Report an error or send a suggestion')}</p>`}
+      ${STATIC ? '<p class="muted">The wiki data is loaded once into your browser.</p>' : ''}
+      ${!REPORTS ? '<p class="muted">Reports are off in this version of the wiki.</p>' : `<p>${link('#/report', 'Report an error or send a suggestion')}</p>`}
       <p><button class="btn btn-quiet" id="about-show-intro">Show the intro again</button></p>
       <section class="about-updates" aria-labelledby="about-updates-h">
         <h2 id="about-updates-h">Updates</h2>
@@ -52,7 +53,7 @@ export function about() {
 }
 
 export function report(params) {
-  if (STATIC) return noReports('Report an error');
+  if (!REPORTS) return noReports('Report an error');
   const where = params.get('from') ?? '';
   return {
     title: 'Report an error',
@@ -61,7 +62,7 @@ export function report(params) {
       <p class="subtitle">Wrong fact, missing detail, spoiler that slipped through — tell us here.</p>
       <form class="report-form" id="report-form">
         <label for="report-ch">Chapter</label>
-        <input id="report-ch" type="number" min="0" value="${store.ch}">
+        <input id="report-ch" type="number" min="1" required value="${store.ch}">
         <label for="report-category">Category</label>
         <select id="report-category">
           ${REPORT_CATEGORIES.map(c => `<option value="${c.key}">${esc(c.label)}</option>`).join('')}
@@ -89,20 +90,16 @@ export function report(params) {
         status.className = 'form-status';
         button.disabled = true;
         try {
-          await api('/api/report', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              ch: $('#report-ch', root).value,
-              category: $('#report-category', root).value,
-              where: $('#report-where', root).value,
-              message: $('#report-message', root).value,
-              contact: $('#report-contact', root).value,
-              website: $('#report-website', root).value,
-            }),
+          await sendReport({
+            ch: $('#report-ch', root).value,
+            category: $('#report-category', root).value,
+            where: $('#report-where', root).value,
+            message: $('#report-message', root).value,
+            contact: $('#report-contact', root).value,
+            website: $('#report-website', root).value,
           });
           $('#report-message', root).value = '';
-          status.textContent = 'Thank you — your report was saved.';
+          status.innerHTML = `Thank you — your report was saved. ${link('#/reports', 'See the reports')}`;
           status.className = 'form-status ok';
         } catch (err) {
           status.textContent = err.message;
@@ -117,13 +114,26 @@ export function report(params) {
 
 // Public list of what readers have reported, grouped by category (spoiler reports are never listed).
 export async function reports(params) {
-  if (STATIC) return noReports('Reports');
-  const list = await api('/api/reports', { fresh: true });
+  if (!REPORTS) return noReports('Reports');
+  const all = await listReports(store.ch);
+  // ?here=1: only those sent from the chapter being read; ?where=…: only those about one page
+  const here = params.get('here') === '1';
+  const about = params.get('where') ?? '';
+  const list = all.filter(r => (!here || r.ch === store.ch) && (!about || r.where === about));
   const filter = params.get('g') ?? '';
   const listed = REPORT_CATEGORIES.filter(c => c.key !== 'spoiler');
   const shown = listed.filter(c => !filter || c.key === filter);
   const count = (key) => list.filter(r => r.category === key).length;
-  const note = 'Spoiler reports are hidden to protect readers.';
+  const note = `Only reports sent by readers up to chapter ${store.ch} are shown, and reports marked as spoilers never are.`
+    + (here ? ` Showing the ones from chapter ${store.ch}.` : '') + (about ? ` Showing the ones about “${esc(about)}”.` : '')
+    + (here || about ? ` ${link('#/reports', 'Show all reports')}` : '');
+  const reportsHash = (g) => {
+    const q = new URLSearchParams();
+    if (g) q.set('g', g);
+    if (here) q.set('here', '1');
+    if (about) q.set('where', about);
+    return `#/reports${q.size ? `?${q}` : ''}`;
+  };
   if (!list.length) {
     return {
       title: 'Reports',
@@ -148,6 +158,7 @@ export async function reports(params) {
             <span class="chip kind">${esc(c.label)}</span>
             ${r.ch != null ? chip(r.ch) : ''}
             ${r.where ? `<span class="muted">${esc(r.where)}</span>` : ''}
+            ${r.status === 'fixed' ? '<span class="tag new">fixed</span>' : ''}
             <span class="muted">${esc(when(r.at))}</span>
           </div>
           <p class="report-message">${esc(r.message)}</p>
@@ -159,8 +170,8 @@ export async function reports(params) {
       <h1 tabindex="-1">Reports</h1>
       <p class="subtitle">${list.length} report${list.length === 1 ? '' : 's'} from readers. Contact details are never shown here. ${note}</p>
       <nav class="filters" aria-label="Report categories">
-        ${link('#/reports', 'All', !filter ? 'active' : '', { current: !filter })}
-        ${listed.map(c => link(`#/reports?g=${c.key}`, `${esc(c.label)} <span class="count">${count(c.key)}</span>`, filter === c.key ? 'active' : '', { current: filter === c.key })).join('')}
+        ${link(reportsHash(''), 'All', !filter ? 'active' : '', { current: !filter })}
+        ${listed.map(c => link(reportsHash(c.key), `${esc(c.label)} <span class="count">${count(c.key)}</span>`, filter === c.key ? 'active' : '', { current: filter === c.key })).join('')}
       </nav>
       ${groups || '<p class="empty">Nothing in this category yet.</p>'}
       <p class="muted">${link('#/report', 'Send a report')}</p>`,
