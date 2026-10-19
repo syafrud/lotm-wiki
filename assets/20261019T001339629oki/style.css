@@ -694,3 +694,24 @@ body.sheet-open .topbar { z-index: 60; }
 }
 @media (max-width: 760px) { .pill-vol, .pill-title { display: none; } }
 @media (max-width: 760px) { .recap-icon { display: none; } }
+
+/* diary entries (PLAN D1.6; restyled in B7): dated pages word for word, serif, the date in bold */
+.diary { max-width: 74ch; }
+.diary-group + .diary-group { margin-top: 22px; }
+.diary-read { font-size: 13px; font-family: var(--mono); font-weight: 500; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); margin: 14px 0 8px; }
+.diary-read a { text-transform: none; font-family: var(--font); font-size: 15px; letter-spacing: 0; }
+.diary-entry { font-family: var(--serif); font-size: 16px; line-height: 1.6; background: var(--bg-elev); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 10px 16px; margin: 0 0 10px; overflow-wrap: anywhere; }
+.diary-entry p { margin: 0; }
+.diary-entry p + p { margin-top: 8px; }
+.diary-date { font-weight: 600; }
+.ov-diary { margin-top: 18px; }
+
+/* update notes after a deploy (PLAN D1.8) */
+.update-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 16px; background: var(--recap-bg); border-bottom: 1px solid var(--recap-line); color: var(--fg); font-size: 15px; }
+.update-banner[hidden] { display: none; }
+.update-text { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+.update-more { white-space: nowrap; }
+.update-list { list-style: none; padding: 0; margin: 0; }
+.update-list li { padding: 8px 0; border-top: 1px solid var(--line); }
+.update-list li:first-child { border-top: 0; }
+.update-date { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-right: 8px; }

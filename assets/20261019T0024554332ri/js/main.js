@@ -15,6 +15,7 @@ import { initPicker, loadChapters, syncPickers, stepChapter, sheetOpen, closeShe
 import { initDrawer, drawerOpen, closeDrawer } from './components/sidebar.js';
 import { initModal, modalOpen, closeDisclaimer } from './components/modal.js';
 import { render, route } from './router.js';
+import { initUpdates } from './components/updates.js';
 
 const content = $('#content');
 
@@ -99,6 +100,7 @@ async function boot() {
     location.hash = `#/search?q=${encodeURIComponent($('#search-input').value.trim())}&ch=${store.ch}`;
   });
   initModal();
+  initUpdates().catch(() => {}); // the notes are a nicety: never hold the page up
   $('#skip-link').addEventListener('click', () => ($('h1', content) ?? content).focus());
 
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';

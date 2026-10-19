@@ -367,6 +367,7 @@ export function entityOverview(db, section, id, n, { since = null } = {}) {
     current_condition: facts.current_condition ? currentCondition(facts.current_condition, n) : null,
     fields,
     chapters_total: chapterRows.length, // the list itself: /api/entity/:s/:id/chapters (PLAN B2.1)
+    entries_total: db.prepare('SELECT COUNT(*) c FROM diary_entries WHERE section = ? AND id = ? AND ch <= ?').get(section, id, n).c, // /entries (D1)
     related: { total: related.length, items: related.slice(0, TOP_LINKS) },
     backlinks: { total: sources.length, items: backlinks },
     recent: { from: recentFrom, total: chapterRows.filter(r => r.ch > recentFrom).length, items: recent },
@@ -401,9 +402,13 @@ export function chapterLines(db, n) {
     return { key: sec.key, items };
   }).filter(s2 => s2.items.length);
   const notes = db.prepare('SELECT kind, value, ch FROM chapter_notes WHERE ch = ? ORDER BY ord').all(n);
+  // diary pages read in this chapter (PLAN D1.5), word for word, in page order
+  const diaryRows = db.prepare('SELECT section, id, date, year, text FROM diary_entries WHERE ch = ? ORDER BY section, id, ord').all(n);
+  const diaryIds = identities(db, n).prefetch(diaryRows.map(r => `${r.section}:${r.id}`));
   return {
     chapter: { n: chapter.n, title: chapter.title, volume: chapter.volume, summary: chapter.summary, headline: chapter.headline || null },
     sections,
+    diary: diaryRows.map(r => ({ section: r.section, id: r.id, heading: headingAt(diaryIds, r.section, r.id, n) ?? r.id, date: r.date, year: r.year, text: r.text })),
     foreshadowing: notes.filter(x => x.kind === 'foreshadowing').map(({ value, ch }) => ({ value, ch })),
     open_questions: notes.filter(x => x.kind === 'open_question').map(({ value, ch }) => ({ value, ch })),
   };
@@ -425,6 +430,20 @@ export function entityChapters(db, section, id, n, { offset = 0, limit = 50 } = 
       .all(section, id, rows[0].ch, rows.at(-1).ch)) headlines.set(r.ch, r.value);
   }
   return { section, id, ch: n, total, offset, limit, items: rows.map(r => ({ ch: r.ch, title: r.title, count: r.n_facts, headline: headlines.get(r.ch) ?? null })) };
+}
+
+// ---- /api/entity/:s/:id/entries -------------------------------------------------------------
+
+// Dated diary entries of one document through n (PLAN D1.5), in reading order: the chapter where
+// they are read, then their order on the page. Null when the entity is unknown through n.
+export function entityEntries(db, section, id, n, { offset = 0, limit = 50 } = {}) {
+  if (!SECTION_BY_KEY[section]) throw new ApiError(404, 'unknown section');
+  const known = db.prepare('SELECT 1 FROM entity_chapters WHERE section = ? AND id = ? AND ch <= ? LIMIT 1').get(section, id, n);
+  if (!known) return null;
+  const total = db.prepare('SELECT COUNT(*) c FROM diary_entries WHERE section = ? AND id = ? AND ch <= ?').get(section, id, n).c;
+  const rows = db.prepare(`SELECT d.ch, c.title, d.date, d.year, d.text FROM diary_entries d JOIN chapters c ON c.n = d.ch
+    WHERE d.section = ? AND d.id = ? AND d.ch <= ? ORDER BY d.ch, d.ord LIMIT ? OFFSET ?`).all(section, id, n, limit, offset);
+  return { section, id, ch: n, total, offset, limit, items: rows.map(r => ({ ch: r.ch, title: r.title, date: r.date, year: r.year, text: r.text })) };
 }
 
 // ---- /api/entity/:s/:id/facts ---------------------------------------------------------------

@@ -5,6 +5,7 @@ import { store } from '../store.js';
 import { chip, link } from '../components/ui.js';
 import { DISCLAIMER_HTML, showDisclaimer, resetDisclaimer } from '../components/modal.js';
 import { STATIC } from '../mode.js';
+import { fetchUpdates, noteHtml } from '../components/updates.js';
 
 // The static site (GitHub Pages) has no server to send reports to.
 const noReports = (title) => ({
@@ -32,9 +33,20 @@ export function about() {
       with the chapter they come from, and nothing from a later chapter is shown.</p>
       <p>Keyboard: <kbd>←</kbd> / <kbd>→</kbd> previous / next chapter, <kbd>/</kbd> search.</p>
       ${STATIC ? '<p class="muted">This is the read-only version of the wiki: the data is loaded once into your browser, and reports are off.</p>' : `<p>${link('#/report', 'Report an error or send a suggestion')}</p>`}
-      <p><button class="btn btn-quiet" id="about-show-intro">Show the intro again</button></p>`,
+      <p><button class="btn btn-quiet" id="about-show-intro">Show the intro again</button></p>
+      <section class="about-updates" aria-labelledby="about-updates-h">
+        <h2 id="about-updates-h">Updates</h2>
+        <div id="about-updates"><p class="muted">Loading…</p></div>
+      </section>`,
     mount(root) {
       $('#about-show-intro', root).addEventListener('click', () => { resetDisclaimer(); showDisclaimer(); });
+      fetchUpdates().then((list) => {
+        const box = $('#about-updates', root);
+        if (!box) return;
+        box.innerHTML = list.length
+          ? `<ul class="update-list">${list.map(u => `<li><span class="update-date">${esc(u.date)}</span>${noteHtml(u.note)}</li>`).join('')}</ul>`
+          : '<p class="empty">No updates recorded.</p>';
+      });
     },
   };
 }

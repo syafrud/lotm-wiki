@@ -5,7 +5,7 @@
 // they need a server and stay in server.js.
 import { SECTIONS, KINDS, GROUPS, SCALAR_FIELDS, IMPORTANCE, ROLES, STATUSES, CHARACTER_GROUPS, RECURRING_MIN_CHAPTERS, fieldLabel, enumLabel } from './lib/schema.js';
 import { buildInfo, chapters, chapterDelta } from './db-query.js';
-import { meta, volume, counts, sectionRows, locations, entityOverview, entityFacts, entityChapter, entityChapters, chapterLines, since, questions, searchEntities } from './api-v2.js';
+import { meta, volume, counts, sectionRows, locations, entityOverview, entityFacts, entityChapter, entityChapters, entityEntries, chapterLines, since, questions, searchEntities } from './api-v2.js';
 
 export function schemaPayload() {
   return {
@@ -102,6 +102,10 @@ export function route(db, url) {
       }
       if (c === 'chapters') {
         const out = entityChapters(db, a, id, n, { offset: int('offset', 0), limit: int('limit', 50, { min: 1, max: 200 }) });
+        return out ? ok(out) : missing('entity');
+      }
+      if (c === 'entries') {
+        const out = entityEntries(db, a, id, n, { offset: int('offset', 0), limit: int('limit', 50, { min: 1, max: 200 }) });
         return out ? ok(out) : missing('entity');
       }
       if (c === 'chapter' && d) {

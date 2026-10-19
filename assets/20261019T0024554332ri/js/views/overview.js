@@ -4,9 +4,25 @@
 import { esc, chapterTitle } from '../util.js';
 import { api } from '../api.js';
 import { store, sectionTitle } from '../store.js';
-import { entityLink, link, notesList } from '../components/ui.js';
+import { entityLink, link, notesList, diaryEntryHtml } from '../components/ui.js';
 
 const LINES_PER_SECTION = 12;
+
+// "Diary pages in this chapter" (PLAN D1.6): the dated entries read here, per diary, word for word
+function diaryBlock(entries) {
+  if (!entries.length) return '';
+  const byDiary = new Map();
+  for (const e of entries) {
+    const k = `${e.section}:${e.id}`;
+    (byDiary.get(k) ?? byDiary.set(k, { ...e, list: [] }).get(k)).list.push(e);
+  }
+  return `<section class="ov-diary">
+    <h2>Diary pages in this chapter</h2>
+    ${[...byDiary.values()].map(d => `<div class="diary">
+      <h3 class="diary-read">${entityLink(d.section, d.id, d.heading)} <span class="chip">${d.list.length}</span></h3>
+      ${d.list.map(diaryEntryHtml).join('')}</div>`).join('')}
+  </section>`;
+}
 
 export async function overview() {
   const n = store.ch;
@@ -38,6 +54,7 @@ export async function overview() {
       <section class="ov-summary">
         <h2>Summary of events</h2>
         <div class="summary">${paragraphs || '<p class="empty">No summary.</p>'}</div>
+        ${diaryBlock(d.diary ?? [])}
       </section>
       <aside class="ov-notes" aria-label="Notes on this chapter">
         <h2>Foreshadowing (this chapter)</h2>${notesList(d.foreshadowing, 'None noted.')}

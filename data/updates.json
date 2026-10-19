@@ -1,0 +1,14 @@
+[
+ {
+  "id": "2026-10-19T00:28Z",
+  "date": "2026-10-19",
+  "build": "20261019T0024554332ri",
+  "note": "Diary pages: the dated entries of Roselle's diary and Klein's notebook, word for word, in a new Entries tab and on each chapter's page. The wiki now tells you what changed after each update."
+ },
+ {
+  "id": "2026-10-18T23:30Z",
+  "date": "2026-10-18",
+  "build": "20261018T232544303cco",
+  "note": "Faster pages and self-hosted fonts: the wiki downloads about half as much on phones and answers searches and pages more quickly."
+ }
+]

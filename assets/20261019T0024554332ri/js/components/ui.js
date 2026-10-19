@@ -104,3 +104,15 @@ export const notesList = (list, empty) => list.length
   : `<p class="empty">${esc(empty)}</p>`;
 
 export { sectionTitle, fieldLabel };
+
+// One dated diary entry (PLAN D1), word for word: its paragraphs, the opening date in bold.
+export function diaryEntryHtml(e) {
+  const head = `“${e.year ? `${e.year}, ` : ''}${e.date}.`;
+  // a site exported with --no-diary-text has the dates only
+  if (!e.text) return `<article class="diary-entry"><p><strong class="diary-date">${esc(head.slice(1, -1))}</strong></p></article>`;
+  const [first, ...rest] = String(e.text).split('\n');
+  const lead = first.startsWith(head)
+    ? `<strong class="diary-date">${esc(head)}</strong>${esc(first.slice(head.length))}`
+    : esc(first);
+  return `<article class="diary-entry"><p>${lead}</p>${rest.map(p => `<p>${esc(p)}</p>`).join('')}</article>`;
+}

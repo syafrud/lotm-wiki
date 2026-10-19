@@ -6,12 +6,12 @@
 import { $, $$, esc, enumLabel, storage, chapterTitle } from '../util.js';
 import { api } from '../api.js';
 import { store, sectionOf, sectionTitle, fieldLabel } from '../store.js';
-import { chip, link, entityLink, notFoundHtml } from '../components/ui.js';
+import { chip, link, entityLink, notFoundHtml, diaryEntryHtml } from '../components/ui.js';
 import { tabsHtml, initTabs } from '../components/tabs.js';
 import { replaceQuery } from '../router.js';
 import { STATIC } from '../mode.js';
 
-const TABS = ['overview', 'facts', 'timeline'];
+const TABS = ['overview', 'entries', 'facts', 'timeline'];
 const ORIGIN_FIELDS = ['origin_zhou_mingrui', 'origin_klein_moretti'];
 const RECENT_FIRST = 5;
 const FACTS_FIRST = 5;
@@ -284,6 +284,35 @@ async function loadChapter(o, sec, c, body) {
   body.dataset.loaded = '1';
 }
 
+// ---- Entries tab (diaries, PLAN D1) ------------------------------------------------------------
+
+// Every dated entry read through the reading chapter, oldest first, grouped by the chapter where
+// the reader reads them. A diary has a few dozen at most, so they load in pages of 200 until done.
+async function loadEntries(o, state) {
+  if (state.entries) return state.entries;
+  const items = [];
+  for (;;) {
+    const page = await api(`/api/entity/${o.section}/${encodeURIComponent(o.id)}/entries?ch=${store.ch}&offset=${items.length}&limit=200`);
+    items.push(...page.items);
+    if (!page.items.length || items.length >= page.total) break;
+  }
+  return (state.entries = items);
+}
+
+function entriesPanel(items) {
+  if (!items.length) return '<p class="empty">No dated entries read yet.</p>';
+  let html = '', ch = null;
+  for (const e of items) {
+    if (e.ch !== ch) {
+      if (ch != null) html += '</section>';
+      ch = e.ch;
+      html += `<section class="diary-group"><h2 class="diary-read">Read in ch ${e.ch}<span class="muted"> · ${esc(chapterTitle(e.title))}</span></h2>`;
+    }
+    html += diaryEntryHtml(e);
+  }
+  return `<p class="muted">Word for word, in the order the pages are read</p><div class="diary">${html}</section></div>`;
+}
+
 // ---- the view ----------------------------------------------------------------------------------
 
 export async function entity(key, id, params) {
@@ -299,7 +328,9 @@ export async function entity(key, id, params) {
     // no hint about when it appears: that would itself be a spoiler
     return { title: 'Not known yet', html: `<h1 tabindex="-1">Not known yet</h1><p class="empty">Not known yet at chapter ${n}.</p>` };
   }
-  const tab = TABS.includes(params.get('tab')) ? params.get('tab') : 'overview';
+  const hasEntries = o.entries_total > 0;
+  const asked = params.get('tab');
+  const tab = TABS.includes(asked) && (asked !== 'entries' || hasEntries) ? asked : 'overview';
   const cards = factCards(o, sec);
   const defaultOpen = (cards.find(c => c.key === 'bio') ?? [...cards].sort((a, b) => b.count - a.count)[0])?.key ?? null;
   const state = {
@@ -319,6 +350,7 @@ export async function entity(key, id, params) {
         <div class="ent-main">
           ${tabsHtml('ent-tabs', [
             { key: 'overview', label: 'Overview' },
+            ...(hasEntries ? [{ key: 'entries', label: 'Entries', count: o.entries_total }] : []),
             { key: 'facts', label: 'All facts', short: 'Facts', count: o.facts_total.toLocaleString('en-US') },
             { key: 'timeline', label: 'Chapter by chapter', short: 'Timeline', count: o.chapters_total },
           ], tab, 'Entity views')}
@@ -332,7 +364,10 @@ export async function entity(key, id, params) {
         current = key;
         replaceQuery({ tab: key === 'overview' ? null : key });
         if (key === 'overview') panel.innerHTML = overviewPanel(o, sec);
-        else if (key === 'facts') {
+        else if (key === 'entries') {
+          if (!state.entries) panel.innerHTML = '<p class="muted">Loading entries…</p>';
+          loadEntries(o, state).then((items) => { if (current === 'entries') panel.innerHTML = entriesPanel(items); });
+        } else if (key === 'facts') {
           panel.innerHTML = factsPanel(o, sec, state);
           const body = state.open && $(`#card-${state.open}`, panel);
           if (body) loadCard(o, sec, cards.find(c => c.key === state.open), body, state.range);
