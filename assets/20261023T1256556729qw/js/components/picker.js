@@ -7,6 +7,9 @@ import { api } from '../api.js';
 import { store, rememberChapter, noteMove } from '../store.js';
 
 const LATER = 'Later chapters';
+export const SIDE = 'Side Stories';
+// shortcut: the novel's volumes are fixed (8 + Side Stories); read them from the chapter index if the series changes
+export const SHELF = [1, 2, 3, 4, 5, 6, 7, 8].map(n => `Volume ${n}`).concat(SIDE);
 const tabsEl = $('#volume-tabs');
 const list = $('#chapter-list');
 const input = $('#chapter-input');
@@ -27,12 +30,15 @@ export async function loadChapters(ch) {
   store.chaptersAt = ch;
 }
 
-// Volumes in reading order, each with its chapters; chapters of volumes not started yet are
-// grouped under LATER.
+// The volume a chapter is in: its name once the volume has started, else only its number
+// ("Volume 2"); LATER only for a chapter the server gives no volume.
+export const volumeOf = (c) => c?.volume ?? (c?.vol === 'side' ? SIDE : c?.vol ? `Volume ${c.vol}` : LATER);
+
+// Volumes in reading order, each with its chapters.
 export function volumes() {
   const out = [];
   for (const c of store.chapters) {
-    const name = c.volume ?? LATER;
+    const name = volumeOf(c);
     let v = out.find(x => x.volume === name);
     if (!v) out.push((v = { volume: name, chapters: [] }));
     v.chapters.push(c);
@@ -40,7 +46,7 @@ export function volumes() {
   return out;
 }
 
-// "I · Clown" for a volume, "Later" for the chapters not reached yet
+// "I · Clown" for a started volume, "II" for one not started yet
 export function volumeLabel(volume) {
   if (volume === LATER) return 'Later';
   const p = volumeParts(volume);
@@ -52,7 +58,7 @@ const range = (v) => `${v.chapters[0].n}–${v.chapters.at(-1).n}`;
 function renderTabs(vols, browsing) {
   tabsEl.innerHTML = vols.map(v => {
     const on = v.volume === browsing;
-    return `<button type="button" role="tab" class="vol-tab${v.volume === LATER ? ' later' : ''}" data-volume="${esc(v.volume)}" aria-selected="${on}" tabindex="${on ? 0 : -1}">
+    return `<button type="button" role="tab" class="vol-tab${v.chapters[0].n > store.ch ? ' later' : ''}" data-volume="${esc(v.volume)}" aria-selected="${on}" tabindex="${on ? 0 : -1}">
       ${esc(volumeLabel(v.volume))} <span class="vol-range">${range(v)}</span></button>`;
   }).join('');
 }
@@ -80,7 +86,7 @@ function setActive(n, { scroll = false } = {}) {
 export function syncPickers() {
   const cur = store.chapters.find(c => c.n === store.ch);
   const vols = volumes();
-  const reading = cur?.volume ?? LATER;
+  const reading = volumeOf(cur);
   const browsing = vols.some(v => v.volume === shownVolume) ? shownVolume : reading;
   renderTabs(vols, browsing);
   renderList(vols.find(v => v.volume === browsing) ?? vols[0]);

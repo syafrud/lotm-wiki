@@ -1,7 +1,7 @@
 // The first-visit disclaimer ("Before you read") with a focus trap, and the shared disclaimer text.
-import { $, esc, storage } from '../util.js';
+import { $, esc, storage, volumeParts } from '../util.js';
 import { store } from '../store.js';
-import { setChapter, volumes, volumeLabel } from './picker.js';
+import { setChapter, volumes, volumeLabel, SHELF, SIDE } from './picker.js';
 
 // One source for the text shown in the first-visit popup and on the About page.
 export const DISCLAIMER_HTML = `
@@ -11,7 +11,9 @@ export const DISCLAIMER_HTML = `
   the summaries</span> behind every entry, so some details may be <span class="hl">wrong or missing</span>.
   Sorry about that — please send corrections and suggestions on the <span class="hl">Report</span> page.</p>
   <p>This is <span class="hl">a hobby project</span> done in spare time, so new chapters may arrive
-  slowly or pause for a while. Thanks for your patience — everything already here keeps working.</p>`;
+  slowly or pause for a while. Thanks for your patience — everything already here keeps working.</p>
+  <p>Want everything at once? The <a href="https://lordofthemysteries.fandom.com/" target="_blank" rel="noopener">Lord of the Mysteries
+  Wiki on Fandom</a> is far more complete, but <span class="hl">it is full of spoilers</span>.</p>`;
 
 const KEY = 'wiki.disclaimer.v1';
 const modal = $('#disclaimer');
@@ -52,16 +54,22 @@ function syncShelf(n, { fromRange = false } = {}) {
   if (!fromRange) range.value = String(n);
   $('#disclaimer-min').textContent = String(v.chapters[0].n);
   $('#disclaimer-max').textContent = `${v.chapters.at(-1).n}${v === volumes().at(-1) ? ' · latest in the wiki' : ''}`;
-  $('#disclaimer-vol-label').textContent = `${volumeLabel(v.volume) === 'Later' ? 'Later chapters' : `Volume ${volumeLabel(v.volume)}`} · I have read up to chapter`;
+  $('#disclaimer-vol-label').textContent = `${v.volume === SIDE ? SIDE : `Volume ${volumeLabel(v.volume)}`} · I have read up to chapter`;
   $('#disclaimer-ok').textContent = `Open the casebook at ch ${n}`;
 }
 
 export function showDisclaimer() {
   $('#disclaimer-text').innerHTML = DISCLAIMER_HTML;
+  // every volume of the novel; one with no chapter in the wiki yet is shown but cannot be picked
   const vols = volumes();
-  const last = vols.length - 1;
-  $('#disclaimer-shelf').innerHTML = vols.map((v, i) => `<button type="button" class="spine${i === last && v.volume === 'Later chapters' ? ' later' : ''}" role="radio" data-volume="${esc(v.volume)}" aria-checked="false" style="--h:${78 + (i % 3) * 8}%">
-      <span>${esc(volumeLabel(v.volume))}</span></button>`).join('');
+  const keyOf = (name) => (volumeParts(name) ? `Volume ${volumeParts(name).n}` : name); // "Volume 1: Clown" → "Volume 1"
+  const shelf = SHELF.map(key => vols.find(v => keyOf(v.volume) === key) ?? { volume: key, chapters: [] });
+  $('#disclaimer-shelf').innerHTML = shelf.map((v, i) => {
+    const missing = !v.chapters.length;
+    const later = missing || v.chapters[0].n > (store.ch ?? 1);
+    return `<button type="button" class="spine${later ? ' later' : ''}${missing ? ' missing' : ''}" role="radio" data-volume="${esc(v.volume)}" aria-checked="false"${missing ? ' aria-disabled="true" title="Not in the wiki yet"' : ''} style="--h:${78 + (i % 3) * 8}%">
+      <span>${esc(v.volume === SIDE ? 'Side' : volumeLabel(v.volume))}</span></button>`;
+  }).join('');
   const input = $('#disclaimer-ch');
   input.max = String(store.chapters.at(-1)?.n ?? 1);
   input.value = String(store.ch ?? 1);
@@ -100,8 +108,8 @@ export function initModal() {
     const b = ev.target.closest('.spine');
     if (!b) return;
     const v = volumes().find(x => x.volume === b.dataset.volume);
-    if (!v) return;
-    // a started volume opens at its last chapter, "Later" at its first
+    if (!v) return; // not in the wiki yet
+    // a started volume opens at its last chapter, one not started yet at its first
     const n = b.classList.contains('later') ? v.chapters[0].n : v.chapters.at(-1).n;
     $('#disclaimer-ch').value = String(n);
     syncShelf(n);
@@ -109,7 +117,7 @@ export function initModal() {
   $('#disclaimer-shelf').addEventListener('keydown', (ev) => {
     if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
     ev.preventDefault();
-    const spines = [...modal.querySelectorAll('.spine')];
+    const spines = [...modal.querySelectorAll('.spine:not(.missing)')];
     const i = spines.indexOf(document.activeElement);
     const to = spines[(i + (ev.key === 'ArrowRight' ? 1 : -1) + spines.length) % spines.length];
     to?.click();

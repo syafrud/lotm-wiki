@@ -27,28 +27,6 @@ export const entityLink = (section, id, label) => link(`#/e/${section}/${encodeU
 export const notFoundHtml = () => ({ title: 'Not found', html: '<h1 tabindex="-1">Not found</h1>' });
 
 export const HIDDEN_FIELDS = new Set(['name', 'true_name', 'title', 'kind', 'role', 'status', 'importance', 'headline', 'parent', 'base', 'related', 'affiliations', 'pathway', 'sequence_number', 'when']);
-export const ORIGIN_FIELDS = ['origin_zhou_mingrui', 'origin_klein_moretti'];
-
-export function factsList(facts, sec, { highlightCh, skip = HIDDEN_FIELDS } = {}) {
-  const out = [];
-  for (const [field, list] of Object.entries(facts)) {
-    if (skip.has(field) || ORIGIN_FIELDS.includes(field)) continue;
-    // a removal is shown on the fact it ends ("until ch X"), or on its own when that fact is not listed
-    const items = list.filter(f => f.op !== 'remove' || !list.some(a => a.op !== 'remove' && a.value === f.value));
-    out.push(`<dt>${esc(fieldLabel(sec, field))}</dt><dd><ul>${items.map(f =>
-      `<li class="${f.ch === highlightCh ? 'current-ch' : ''}${f.until != null || f.op === 'remove' ? ' ended' : ''}">${f.op === 'remove' ? 'No longer: ' : ''}${esc(f.value)} ${chip(f.ch)}${f.until != null ? ` <span class="muted">until ch ${f.until}</span>` : ''}</li>`).join('')}</ul></dd>`);
-  }
-  return out.length ? `<dl class="facts">${out.join('')}</dl>` : '<p class="empty">Nothing recorded yet.</p>';
-}
-
-export function originBlocks(facts, sec, highlightCh) {
-  const blocks = ORIGIN_FIELDS.filter(f => facts[f]?.length).map(f => `
-    <div class="origin-card">
-      <h2 class="origin-title">${esc(fieldLabel(sec, f))}</h2>
-      <ul>${facts[f].map(x => `<li class="${x.ch === highlightCh ? 'current-ch' : ''}">${esc(x.value)} ${chip(x.ch)}</li>`).join('')}</ul>
-    </div>`);
-  return blocks.length ? `<div class="origins">${blocks.join('')}</div>` : '';
-}
 
 // former names + aliases, without repeating the heading or each other
 export function akaOf(e) {
@@ -88,15 +66,6 @@ export function groupedCards(sec, groups, opts = {}, depth = 0) {
     ${g.title ? `<h${h} class="group-title depth-${depth}">${esc(g.title)} <span class="chip">${groupSize(g)}</span></h${h}>` : ''}
     ${g.entries.length ? `<div class="cards depth-${depth}">${g.entries.map(e => entityCard(sec, e, opts)).join('')}</div>` : ''}
     ${groupedCards(sec, g.children ?? [], opts, depth + 1)}`).join('');
-}
-
-export function locationTreeHtml(entries) {
-  if (!entries.length) return '<p class="empty">Nothing recorded yet.</p>';
-  return `<ul class="loc-tree">${entries.map(e => `
-    <li style="--depth:${e.depth ?? 0}">
-      ${entityLink('locations', e.id, e.heading)}
-      ${metaChips(e.meta)} ${chip(e.first_ch)}
-    </li>`).join('')}</ul>`;
 }
 
 export const notesList = (list, empty) => list.length

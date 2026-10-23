@@ -45,12 +45,17 @@ export const TOPICS = {
   ],
 };
 
-const SEQUENCE_BANDS = [
-  { label: 'Low Sequence', from: 9, to: 7 }, { label: 'Mid Sequence', from: 6, to: 5 },
-  { label: 'High Sequence · Saint', from: 4, to: 3 }, { label: 'High Sequence · Angel', from: 2, to: 1 },
-  { label: 'True God', from: 0, to: 0 },
-];
-const band = (n) => SEQUENCE_BANDS.find(b => n <= b.from && n >= b.to);
+// only what the text has said by then: ch 96 Low 9–8 · Mid 7–5 · High 4–1; ch 148 Saints 4–3 and
+// Grounded Angels 2–1; ch 265 a Sequence 0 above Sequence 1, the Sequence of a True God
+export const SEQUENCE_0_CH = 265;
+function bandsAt(ch) {
+  if (ch < 96) return [];
+  const high = ch < 148 ? [{ label: 'High Sequence', from: 4, to: 1 }]
+    : [{ label: 'High Sequence · Saint', from: 4, to: 3 }, { label: 'High Sequence · Grounded Angel', from: 2, to: 1 }];
+  return [{ label: 'Low Sequence', from: 9, to: 8 }, { label: 'Mid Sequence', from: 7, to: 5 }, ...high,
+    ...(ch >= SEQUENCE_0_CH ? [{ label: 'True God', from: 0, to: 0 }] : [])];
+}
+const band = (n) => bandsAt(store.ch).find(b => n <= b.from && n >= b.to)?.label ?? null;
 const factValue = (f) => (f.ref ? entityLink(f.ref.section, f.ref.id, f.ref.heading) : esc(f.value));
 const chChip = (ch) => `<span class="ch-chip${ch === store.ch ? ' current' : ''}">ch ${ch}</span>`;
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -113,7 +118,8 @@ function progressPanel(o) {
   let html = '', cur = null;
   for (const r of rows) {
     const b = band(r.sequence_number);
-    if (b !== cur) { html += `<tr class="band"><th colspan="3" scope="colgroup">${esc(b?.label ?? 'Sequence')}</th></tr>`; cur = b; }
+    if (b && b !== cur) html += `<tr class="band"><th colspan="3" scope="colgroup">${esc(b)}</th></tr>`;
+    cur = b;
     html += `<tr><td class="seq-n">${r.sequence_number}</td>
       <th scope="row">${r.sequence ? entityLink(r.sequence.section, r.sequence.id, r.sequence.heading) : '<span class="sealed">name not recorded</span>'}
         ${r.pathway ? `<span class="muted">· ${entityLink(r.pathway.section, r.pathway.id, r.pathway.heading)}</span>` : ''}</th>
@@ -124,7 +130,7 @@ function progressPanel(o) {
     <p class="muted">The Sequences recorded so far, highest first. Later ones stay hidden until you read them.</p>`;
 }
 
-// the ladder 9 → 0 of the pathway this entity belongs to (a pathway, or one of its Sequences)
+// the ladder 9 → 1 (→ 0 once the text has named it) of the pathway this entity belongs to (a pathway, or one of its Sequences)
 async function sequencesPanel(o) {
   const tree = await api(`/api/pathways?ch=${store.ch}`);
   const g = tree.pathways.find(p => p.id === o.id) ?? tree.pathways.find(p => p.sequences.some(s => s.id === o.id));
@@ -139,9 +145,10 @@ export function ladderHtml(g, { highlight = null } = {}) {
   const by = new Map();
   for (const s of g.sequences) (by.get(s.seq) ?? by.set(s.seq, []).get(s.seq)).push(s);
   let html = '', cur = null;
-  for (let n = 9; n >= 0; n--) {
+  for (let n = 9; n >= (store.ch >= SEQUENCE_0_CH ? 0 : 1); n--) {
     const b = band(n);
-    if (b !== cur) { html += `<tr class="band"><th colspan="2" scope="colgroup">${esc(b.label)}</th></tr>`; cur = b; }
+    if (b && b !== cur) html += `<tr class="band"><th colspan="2" scope="colgroup">${esc(b)}</th></tr>`;
+    cur = b;
     const list = by.get(n) ?? [];
     html += `<tr class="${list.some(s => s.id === highlight) ? 'here' : ''}${list.length ? '' : ' unknown'}"><td class="seq-n">${n}</td>
       <td>${list.length ? list.map(s => entityLink(s.section, s.id, s.heading.replace(/\s*\(Sequence \d\)$/, ''))).join(' · ') : `<span class="sealed">not known at ch ${store.ch}</span>`}</td></tr>`;

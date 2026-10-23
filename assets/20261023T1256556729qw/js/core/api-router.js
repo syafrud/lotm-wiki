@@ -31,6 +31,8 @@ export function chaptersAt(list, n) {
     n: c.n,
     title: c.n <= n + 1 && (c.volume === reading || c.n === n + 1) ? c.title : null,
     volume: started.has(c.volume) ? c.volume : null,
+    // the volume's number is no spoiler (its name is): the shelf shows II before Volume 2 starts
+    vol: /^Side Stories/.test(c.volume) ? 'side' : Number(/^Volume (\d+)/.exec(c.volume)?.[1]) || null,
   }));
 }
 
