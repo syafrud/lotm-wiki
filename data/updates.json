@@ -1,5 +1,11 @@
 [
  {
+  "id": "2026-10-23T11:24Z",
+  "date": "2026-10-23",
+  "build": "20261023T111420440yh1",
+  "note": "Volume 1 tidied up: characters now show their Sequences in a Progress tab, memberships and items end when the story ends them, every pathway has its proper name and ladder, and chapter summaries for chapters 101–213 are shorter and easier to read."
+ },
+ {
   "id": "2026-10-23T10:05Z",
   "date": "2026-10-23",
   "build": "20261023T095959494p4e",

@@ -5,7 +5,7 @@
 // they need a server and stay in server.js.
 import { SECTIONS, KINDS, GROUPS, SCALAR_FIELDS, IMPORTANCE, ROLES, STATUSES, CHARACTER_GROUPS, RECURRING_MIN_CHAPTERS, fieldLabel, enumLabel } from './lib/schema.js';
 import { buildInfo, chapters, chapterDelta } from './db-query.js';
-import { meta, volume, counts, sectionRows, locations, entityOverview, entityFacts, entityChapter, entityChapters, entityEntries, chapterLines, since, questions, searchEntities } from './api-v2.js';
+import { meta, volume, counts, sectionRows, locations, entityOverview, entityFacts, entityChapter, entityChapters, entityEntries, entityMembers, pathways, chapterLines, since, questions, searchEntities } from './api-v2.js';
 
 export function schemaPayload() {
   return {
@@ -84,6 +84,7 @@ export function route(db, url) {
         imp: url.searchParams.get('imp') || null,
         sort: url.searchParams.get('sort') || 'importance',
         q: url.searchParams.get('q') ?? '',
+        start: /^[A-Z#]$/.test(url.searchParams.get('start') ?? '') ? url.searchParams.get('start') : null,
         offset: int('offset', 0),
         limit: int('limit', 50, { min: 1, max: 200 }),
         view,
@@ -102,6 +103,11 @@ export function route(db, url) {
       }
       if (c === 'chapters') {
         const out = entityChapters(db, a, id, n, { offset: int('offset', 0), limit: int('limit', 50, { min: 1, max: 200 }) });
+        return out ? ok(out) : missing('entity');
+      }
+      if (c === 'members') {
+        if (a !== 'organizations') return unknown();
+        const out = entityMembers(db, id, n);
         return out ? ok(out) : missing('entity');
       }
       if (c === 'entries') {
@@ -129,6 +135,7 @@ export function route(db, url) {
       return ok(questions(db, chOf(), { from: int('from', 0), offset: int('offset', 0), limit: int('limit', 20, { min: 1, max: 100 }) }));
     }
     if (resource === 'locations') return ok(locations(db, chOf()));
+    if (resource === 'pathways') return ok(pathways(db, chOf()));
     if (resource === 'search') return ok(searchEntities(db, url.searchParams.get('q') ?? '', chOf(), { limit: int('limit', 30, { min: 1, max: 100 }) }));
     return unknown();
   } catch (err) {

@@ -10,6 +10,7 @@ import { chip, link, entityLink, notFoundHtml, diaryEntryHtml } from '../compone
 import { tabsHtml, initTabs } from '../components/tabs.js';
 import { replaceQuery } from '../router.js';
 import { volumeLabel } from '../components/picker.js';
+import { topicTabs, isTopic, renderTopic, moreTopic } from './entity-topics.js';
 import { REPORTS } from '../mode.js';
 import { reportCounts } from '../components/reports.js';
 
@@ -62,6 +63,8 @@ function headerHtml(o, sec) {
   if (o.infobox.parent) kicker.push(`<span aria-hidden="true">›</span> ${entityLink(o.infobox.parent.section, o.infobox.parent.id, o.infobox.parent.heading)}`);
   const tags = [o.meta.role, o.meta.kind].filter(Boolean).map(v => `<span class="kicker-tag${v === 'protagonist' ? ' hot' : ''}">${esc(enumLabel(v))}</span>`);
   if (o.meta.status === 'dead') tags.push('<span class="kicker-tag dead">Dead</span>');
+  const seq = currentSequence(o);
+  if (seq) tags.push(`<span class="kicker-tag seq">${esc(seq.pathway ? seq.pathway.heading.replace(/\s*pathway.*$/i, '') : 'Beyonder')} · Seq ${seq.sequence_number}</span>`);
   const stat = (big, label) => `<div><dd>${big}</dd><dt>${label}</dt></div>`;
   return `<header class="ent-head">
     <div class="ent-id">
@@ -129,6 +132,34 @@ function recapHtml(o) {
   </section>`;
 }
 
+// "On this page" (PLAN B8.5): the open tab's headings; hidden for one heading or none.
+function updateToc(root, panel) {
+  const toc = $('#ent-toc', root);
+  if (!toc) return;
+  const heads = [...panel.querySelectorAll('h2')];
+  heads.forEach((h, i) => { if (!h.id) h.id = `t-h${i}`; });
+  if (heads.length < 2) { toc.hidden = true; toc.innerHTML = ''; return; }
+  toc.innerHTML = `<h2 class="toc-title">On this page</h2><ol>${heads.map(h => `<li><a href="#" data-target="${h.id}">${esc(h.textContent.replace(/\s+\d+$/, '').trim())}</a></li>`).join('')}</ol>`;
+  toc.hidden = false;
+}
+
+// "In the casebook" (PLAN B8.5): everything linked to this entry, by section, folded.
+function navboxHtml(o) {
+  const all = [...o.connections.items, ...o.related.items, ...o.backlinks.items, ...(o.infobox.affiliations ?? [])]
+    .filter((r, i, a) => r.heading && a.findIndex(x => x.section === r.section && x.id === r.id) === i);
+  if (!all.length) return '';
+  const by = new Map();
+  for (const r of all) (by.get(r.section) ?? by.set(r.section, []).get(r.section)).push(r);
+  const order = store.schema.sections.map(s => s.key).filter(k => by.has(k));
+  return `<details class="navbox">
+    <summary><span class="kicker">In the casebook</span> <span class="navbox-title">${esc(o.name)} and what is linked to it</span> <span class="count-tag">${all.length}</span></summary>
+    <dl>${order.map(k => `<dt>${esc(sectionTitle(k))}</dt><dd>${by.get(k).map(r => entityLink(r.section, r.id, r.name ?? r.heading)).join('<span class="sep" aria-hidden="true"> · </span>')}</dd>`).join('')}</dl>
+  </details>`;
+}
+
+// The character's latest Sequence (PLAN B8.2), or null.
+const currentSequence = (o) => o.progress?.length ? [...o.progress].sort((a, b) => b.ch - a.ch || a.sequence_number - b.sequence_number)[0] : null;
+
 // Dossier (design 1a): the entity as of the reading chapter.
 function infoboxHtml(o, sec) {
   const rows = [];
@@ -138,8 +169,15 @@ function infoboxHtml(o, sec) {
   else if (o.meta.kind) add('Kind', esc(enumLabel(o.meta.kind)));
   if (o.meta.importance && sec.key !== 'characters') add('Importance', esc(enumLabel(o.meta.importance)));
   if (o.entries_total) add('Entries', `${o.entries_total} dated ${o.entries_total === 1 ? 'page' : 'pages'}`);
-  if (o.infobox.pathway) add('Pathway', entityLink(o.infobox.pathway.section, o.infobox.pathway.id, o.infobox.pathway.heading));
-  if (o.meta.sequence_number != null) add('Sequence', withCh(o.meta.sequence_number, 'sequence_number'));
+  const seq = currentSequence(o);
+  if (seq) {
+    // a Beyonder: "Seer pathway · Sequence 7 Magician" (PLAN B8.2)
+    add('Pathway', seq.pathway ? entityLink(seq.pathway.section, seq.pathway.id, seq.pathway.heading) : '');
+    add('Sequence', `${seq.sequence_number}${seq.sequence ? ` · ${entityLink(seq.sequence.section, seq.sequence.id, seq.sequence.heading.replace(/\s*\(Sequence \d\)$/, ''))}` : ''} <span class="dossier-ch">ch ${seq.ch}</span>`);
+  } else {
+    if (o.infobox.pathway) add('Pathway', entityLink(o.infobox.pathway.section, o.infobox.pathway.id, o.infobox.pathway.heading));
+    if (o.meta.sequence_number != null) add('Sequence', withCh(o.meta.sequence_number, 'sequence_number'));
+  }
   if (o.meta.title && sec.key !== 'pathways_sequences') add('Title', withCh(o.meta.title, 'title'));
   if (o.infobox.parent) add('Part of', entityLink(o.infobox.parent.section, o.infobox.parent.id, o.infobox.parent.heading));
   if (o.infobox.base) add('Based in', entityLink(o.infobox.base.section, o.infobox.base.id, o.infobox.base.heading));
@@ -377,8 +415,17 @@ export async function entity(key, id, params) {
     return { title: 'Not known yet', html: `<h1 tabindex="-1">Not known yet</h1><p class="empty">Not known yet at chapter ${n}.</p>` };
   }
   const hasEntries = o.entries_total > 0;
+  // topical tabs (PLAN B8.1): a location's "Places inside" needs the location tree
+  const cache = {};
+  if (key === 'locations') {
+    cache.locations = await api(`/api/locations?ch=${n}`).catch(() => []);
+    const i = cache.locations.findIndex(r => r.id === o.id);
+    cache.hasPlaces = i >= 0 && (cache.locations[i + 1]?.depth ?? 0) > (cache.locations[i].depth ?? 0);
+  }
+  const topics = topicTabs(o, sec, { hasPlaces: cache.hasPlaces });
   const asked = params.get('tab');
-  const tab = TABS.includes(asked) && (asked !== 'entries' || hasEntries) ? asked : 'overview';
+  const valid = [...TABS, ...topics.map(t => t.key)];
+  const tab = valid.includes(asked) && (asked !== 'entries' || hasEntries) ? asked : 'overview';
   const cards = factCards(o, sec);
   const defaultOpen = (cards.find(c => c.key === 'bio') ?? [...cards].sort((a, b) => b.count - a.count)[0])?.key ?? null;
   const state = {
@@ -401,12 +448,17 @@ export async function entity(key, id, params) {
           ${tabsHtml('ent-tabs', [
             { key: 'overview', label: 'Overview' },
             ...(hasEntries ? [{ key: 'entries', label: 'Entries', count: o.entries_total }] : []),
+            ...topics,
             { key: 'facts', label: 'All facts', short: 'Facts', count: o.facts_total.toLocaleString('en-US') },
             { key: 'timeline', label: 'Chapter by chapter', short: 'Timeline', count: o.chapters_total },
           ], tab, 'Entity views')}
         </div>
-        ${infoboxHtml(o, sec)}
+        <div class="ent-aside">
+          ${infoboxHtml(o, sec)}
+          <nav class="toc" id="ent-toc" aria-label="On this page" hidden></nav>
+        </div>
       </div>
+      ${navboxHtml(o)}
     </article>`,
     mount(root) {
       // readers' reports about this page, from chapters already read (the same "where" the Report link fills in)
@@ -424,8 +476,13 @@ export async function entity(key, id, params) {
       const renderPanel = (key, panel) => {
         current = key;
         replaceQuery({ tab: key === 'overview' ? null : key });
-        if (key === 'overview') panel.innerHTML = overviewPanel(o, sec);
-        else if (key === 'entries') {
+        const toc = $('#ent-toc', root);
+        if (toc) toc.hidden = true; // the overview and topic tabs fill it again
+        if (key === 'overview') { panel.innerHTML = overviewPanel(o, sec); updateToc(root, panel); }
+        else if (isTopic(sec, key)) {
+          panel.innerHTML = '<p class="muted">Loading…</p>';
+          renderTopic(key, o, sec, panel, cache).then(() => { if (current === key) updateToc(root, panel); }).catch(err => { panel.innerHTML = `<p class="empty">${esc(err.message)}</p>`; });
+        } else if (key === 'entries') {
           if (!state.entries) panel.innerHTML = '<p class="muted">Loading entries…</p>';
           loadEntries(o, state).then((items) => { if (current === 'entries') panel.innerHTML = entriesPanel(items); });
         } else if (key === 'facts') {
@@ -459,6 +516,17 @@ export async function entity(key, id, params) {
       // listen on the article: #content outlives this page
       $('.ent', root).addEventListener('click', async (ev) => {
         const t = ev.target;
+        const topicMore = t.closest('.topic-more');
+        if (topicMore) return moreTopic(o, sec, topicMore);
+        const tocLink = t.closest('#ent-toc a[href^="#t-"], #ent-toc a[data-target]');
+        if (tocLink) {
+          ev.preventDefault();
+          const el = document.getElementById(tocLink.dataset.target);
+          el?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          el?.setAttribute('tabindex', '-1');
+          el?.focus({ preventScroll: true });
+          return;
+        }
         const fieldLink = t.closest('[data-open-field]');
         if (fieldLink) { ev.preventDefault(); return openField(fieldLink.dataset.openField); }
         const reveal = t.closest('[data-reveal]');
