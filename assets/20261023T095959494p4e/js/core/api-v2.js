@@ -104,7 +104,8 @@ export const STALE_AFTER = 50; // a row not seen for more than this many chapter
 //   imp: one importance or several ("major,notable"); q: part of the heading or id.
 // Also returned: all (rows before any filter), imp_counts (per importance, after the name filter),
 // stale (matching rows not seen in the last STALE_AFTER chapters), max_appearances.
-export function sectionRows(db, key, n, { imp = null, sort = 'importance', q = '', offset = 0, limit = 50, view = 'list' } = {}) {
+//   start: one letter (A–Z) or '#' — only names starting with it (the A–Z row, PLAN B8.5)
+export function sectionRows(db, key, n, { imp = null, sort = 'importance', q = '', start = null, offset = 0, limit = 50, view = 'list' } = {}) {
   if (!SECTION_BY_KEY[key]) throw new ApiError(404, 'unknown section');
   if (!SORTS[sort]) throw new ApiError(400, `sort is one of ${Object.keys(SORTS).join(', ')}`);
   const imps = imp ? String(imp).split(',').filter(Boolean) : [];
@@ -148,6 +149,7 @@ export function sectionRows(db, key, n, { imp = null, sort = 'importance', q = '
     all++;
     maxApps = Math.max(maxApps, c.count);
     if (needle && !heading.toLowerCase().includes(needle) && !id.includes(needle)) continue;
+    if (start && initialOf(heading) !== start) continue;
     if (m.importance in impCounts) impCounts[m.importance]++;
     if (imps.length && !imps.includes(m.importance)) continue;
     rows.push({
@@ -177,6 +179,10 @@ export function sectionRows(db, key, n, { imp = null, sort = 'importance', q = '
   if (view !== 'list') throw new ApiError(400, 'view is list or groups');
   return { section: key, ch: n, total: rows.length, ...stats, offset, limit, rows: withPreviews(rows.slice(offset, offset + limit)).map(slim) };
 }
+
+// First letter for the A–Z row: A–Z, or '#' for anything else (digits, quotes, other scripts).
+// (the heading as sorted by "A–Z", leading quotes skipped)
+export const initialOf = (name) => { const c = String(name ?? '').replace(/^[^\p{L}\p{N}]+/u, '').charAt(0).toUpperCase(); return /[A-Z]/.test(c) ? c : '#'; };
 
 // The preview line of each entity: its latest headline, else its newest fact outside the header
 // fields. One indexed lookup per entity (facts_field / facts_entity), not a scan of the section.
@@ -369,6 +375,8 @@ export function entityOverview(db, section, id, n, { since = null } = {}) {
     chapters_total: chapterRows.length, // the list itself: /api/entity/:s/:id/chapters (PLAN B2.1)
     // facts per chapter present, oldest first (the presence scrubber, PLAN B7); 0 = only named there
     presence: chapterRows.map(r => ({ ch: r.ch, facts: r.n_facts })),
+    // a character's Sequences, oldest first (the Progress tab, PLAN B8.2)
+    progress: section === 'characters' && facts.sequence_number?.length ? progressOf(facts, n, pathwayTree(db, n)) : [],
     entries_total: db.prepare('SELECT COUNT(*) c FROM diary_entries WHERE section = ? AND id = ? AND ch <= ?').get(section, id, n).c, // /entries (D1)
     related: { total: related.length, items: related.slice(0, TOP_LINKS) },
     backlinks: { total: sources.length, items: backlinks },
@@ -453,6 +461,130 @@ export function entityEntries(db, section, id, n, { offset = 0, limit = 50 } = {
   const rows = db.prepare(`SELECT d.ch, c.title, d.date, d.year, d.text FROM diary_entries d JOIN chapters c ON c.n = d.ch
     WHERE d.section = ? AND d.id = ? AND d.ch <= ? ORDER BY d.ch, d.ord LIMIT ? OFFSET ?`).all(section, id, n, limit, offset);
   return { section, id, ch: n, total, offset, limit, items: rows.map(r => ({ ch: r.ch, title: r.title, date: r.date, year: r.year, text: r.text })) };
+}
+
+// ---- /api/pathways (PLAN B8.3) --------------------------------------------------------------
+
+// The pathways known through n as ladders 9 → 0. A Sequence's `pathway` may point at the pathway
+// or at another Sequence of the same line (often its Sequence 9, when the pathway itself has no
+// entry yet): it is followed up to the root, and a Sequence that others point to stands in for its
+// pathway (kind "line"). Sequences that lead nowhere are listed under `unplaced`.
+export function pathwayTree(db, n) {
+  const S = 'pathways_sequences';
+  const known = new Set(db.prepare('SELECT DISTINCT id FROM entity_chapters WHERE section = ? AND ch <= ?').all(S, n).map(r => r.id));
+  const e = new Map();
+  for (const id of known) e.set(id, {});
+  for (const r of db.prepare(`SELECT entity_id, field, value FROM facts WHERE section = ? AND ch <= ? AND op = 'add'
+      AND field IN ('kind', 'pathway', 'sequence_number') ORDER BY ch, ord`).all(S, n)) {
+    if (e.has(r.entity_id)) e.get(r.entity_id)[r.field] = r.value; // the latest value wins
+  }
+  const target = (v) => { const r = refOf(v) ?? { section: S, id: String(v) }; return r.section === S && e.has(r.id) ? r.id : null; };
+  const rootOf = (id) => {
+    let cur = id;
+    for (let i = 0; i < 5; i++) {
+      const x = e.get(cur);
+      if (x.kind === 'pathway') return cur;
+      const t = x.pathway ? target(x.pathway) : null;
+      if (!t || t === cur) return cur;
+      cur = t;
+    }
+    return cur;
+  };
+  const num = (x) => /^\d$/.test(String(x.sequence_number ?? '')) ? Number(x.sequence_number) : null;
+  const ids = identities(db, n).prefetch([...known].map(id => `${S}:${id}`));
+  const groups = new Map(); // root id -> group
+  const group = (root) => groups.get(root) ?? groups.set(root, {
+    section: S, id: root, kind: e.get(root).kind === 'pathway' ? 'pathway' : 'line',
+    heading: headingAt(ids, S, root, n) ?? root, sequences: [],
+  }).get(root);
+  for (const [id, x] of e) if (x.kind === 'pathway') group(id);
+  const pointedAt = new Set();
+  for (const [id, x] of e) if (x.kind !== 'pathway' && x.pathway && target(x.pathway) && target(x.pathway) !== id) pointedAt.add(rootOf(id));
+  const unplaced = [];
+  for (const [id, x] of e) {
+    if (x.kind !== 'sequence' || num(x) == null) continue;
+    const root = rootOf(id);
+    const item = { seq: num(x), section: S, id, heading: headingAt(ids, S, id, n) ?? id }; // `seq`, not `n`: n is a chapter
+    if (root === id && !pointedAt.has(id) && e.get(id).kind !== 'pathway') unplaced.push(item);
+    else group(root).sequences.push(item);
+  }
+  const byNum = (a, b) => b.seq - a.seq || a.heading.localeCompare(b.heading);
+  const out = [...groups.values()].map(g => ({ ...g, sequences: g.sequences.sort(byNum) }))
+    .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'pathway' ? -1 : 1) || a.heading.localeCompare(b.heading));
+  return { ch: n, pathways: out, unplaced: unplaced.sort(byNum), rootOf: (id) => (e.has(id) ? rootOf(id) : null) };
+}
+
+export function pathways(db, n) {
+  const { rootOf, ...tree } = pathwayTree(db, n);
+  return tree;
+}
+
+// A character's Sequences through n (PLAN B8.2): one row per `sequence_number` fact, with the
+// pathway in force at that chapter and the Sequence entry of that pathway and number.
+function progressOf(facts, n, tree) {
+  if (!facts.sequence_number?.length) return [];
+  const roots = new Map(tree.pathways.map(g => [g.id, g]));
+  return facts.sequence_number.filter(f => f.ch <= n && f.op !== 'remove').map(f => {
+    const pf = latestFact(facts.pathway, f.ch);
+    const ref = pf ? refOf(pf.value) ?? { section: 'pathways_sequences', id: pf.value } : null;
+    const root = ref ? tree.rootOf(ref.id) : null;
+    const g = root ? roots.get(root) : null;
+    const seq = g?.sequences.find(s => String(s.seq) === String(f.value)) ?? null;
+    return {
+      ch: f.ch, sequence_number: Number(f.value),
+      pathway: g ? { section: g.section, id: g.id, heading: g.heading } : null,
+      sequence: seq ? { section: seq.section, id: seq.id, heading: seq.heading } : null,
+    };
+  });
+}
+
+// ---- /api/entity/organizations/:id/members (PLAN B8.4) ---------------------------------------
+
+// The characters whose `affiliations` point at this organisation through n: current members first
+// (by the chapter they joined), then former ones (an `op: remove` ended it). `notes` are the
+// organisation's own `members` facts (free text, newest first).
+export function entityMembers(db, id, n) {
+  const known = db.prepare("SELECT 1 FROM entity_chapters WHERE section = 'organizations' AND id = ? AND ch <= ? LIMIT 1").get(id, n);
+  if (!known) return null;
+  const state = new Map(); // character id -> { joined, left, active }
+  for (const r of db.prepare(`SELECT src_id, ch, op FROM refs WHERE src_section = 'characters' AND field = 'affiliations'
+      AND dst_section = 'organizations' AND dst_id = ? AND ch <= ? ORDER BY ch`).all(id, n)) {
+    const s = state.get(r.src_id) ?? state.set(r.src_id, { joined: r.ch, left: null, active: false }).get(r.src_id);
+    if (r.op === 'remove') { s.active = false; s.left = r.ch; } else { if (!s.active && s.left != null) s.joined = r.ch; s.active = true; s.left = null; }
+  }
+  const ids = identities(db, n).prefetch([...state.keys()].map(c => `characters:${c}`));
+  const meta = new Map();
+  if (state.size) {
+    for (const r of db.prepare(`SELECT entity_id, field, value, ch FROM facts WHERE section = 'characters' AND ch <= ?
+        AND field IN ('title', 'status', 'pathway', 'sequence_number') AND op = 'add' AND entity_id IN (SELECT value FROM json_each(?)) ORDER BY ch, ord`)
+      .all(n, JSON.stringify([...state.keys()]))) {
+      const m = meta.get(r.entity_id) ?? meta.set(r.entity_id, {}).get(r.entity_id);
+      m[r.field] = r.value;
+    }
+  }
+  const tree = state.size ? pathwayTree(db, n) : null;
+  const roots = new Map((tree?.pathways ?? []).map(g => [g.id, g]));
+  const rows = [];
+  for (const [cid, s] of state) {
+    const heading = headingAt(ids, 'characters', cid, n);
+    if (!heading) continue;
+    const m = meta.get(cid) ?? {};
+    const ref = m.pathway ? refOf(m.pathway) ?? { id: m.pathway } : null;
+    const g = ref ? roots.get(tree.rootOf(ref.id)) : null;
+    rows.push({
+      section: 'characters', id: cid, heading, name: latest(ids.get('characters', cid)?.name, n) ?? heading,
+      title: m.title ?? null, status: m.status ?? null, joined: s.joined, left: s.active ? null : s.left,
+      pathway: g ? { section: g.section, id: g.id, heading: g.heading } : null,
+      sequence_number: m.sequence_number != null ? Number(m.sequence_number) : null,
+    });
+  }
+  const notes = db.prepare(`SELECT value, ch FROM facts WHERE section = 'organizations' AND entity_id = ? AND field = 'members' AND ch <= ? ORDER BY ch DESC, ord`).all(id, n);
+  return {
+    section: 'organizations', id, ch: n,
+    current: rows.filter(r => r.left == null).sort((a, b) => a.joined - b.joined || a.heading.localeCompare(b.heading)),
+    former: rows.filter(r => r.left != null).sort((a, b) => b.left - a.left || a.heading.localeCompare(b.heading)),
+    notes: linkRefs(identities(db, n), notes, n),
+  };
 }
 
 // ---- /api/entity/:s/:id/facts ---------------------------------------------------------------

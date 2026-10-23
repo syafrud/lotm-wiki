@@ -14,6 +14,7 @@ import { search } from './views/search.js';
 import { about, report, reports } from './views/pages.js';
 import { questions, since } from './views/reading.js';
 import { volume } from './views/volume.js';
+import { pathwaysPage } from './views/pathways.js';
 
 const SITE = 'Mysteries Wiki';
 const content = $('#content');
@@ -36,6 +37,7 @@ function viewFor(path, params) {
   if (path === '/search') return search(params.get('q') ?? '', params);
   if (parts[0] === 'volume' && /^\d+$/.test(parts[1] ?? '') && parts.length === 2) return volume(Number(parts[1]));
   if (path === '/questions') return questions();
+  if (path === '/pathways') return pathwaysPage();
   if (path === '/since') return since(params);
   if (path === '/about') return about();
   if (path === '/report') return report(params);

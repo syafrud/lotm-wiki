@@ -11,7 +11,8 @@ const PAGE = 50;
 const STALE_AFTER = 50;
 const IMPS = ['major', 'notable', 'minor'];
 const SORTS = [['last', 'Recently seen'], ['appearances', 'Most chapters'], ['name', 'A–Z']];
-const DEFAULTS = { imp: 'major,notable', sort: 'last', view: 'list', q: '' };
+const DEFAULTS = { imp: 'major,notable', sort: 'last', view: 'list', q: '', start: '' };
+const LETTERS = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
 
 const stale = (r) => store.ch - r.last_ch > STALE_AFTER;
 
@@ -26,6 +27,8 @@ function readFilters(key, params) {
     sort: SORTS.some(([s]) => s === pick('sort')) ? pick('sort') : DEFAULTS.sort,
     view: ['list', 'cards'].includes(pick('view')) ? pick('view') : DEFAULTS.view,
     q: pick('q') ?? '',
+    // A–Z (PLAN B8.5): one letter, only with the A–Z sort; kept in the hash, not remembered
+    start: LETTERS.includes(params.get('start')) ? params.get('start') : '',
   };
 }
 
@@ -37,11 +40,12 @@ function saveFilters(key, f) {
     sort: out.sort === DEFAULTS.sort ? null : out.sort,
     view: out.view === DEFAULTS.view ? null : out.view,
     q: out.q || null,
+    start: f.sort === 'name' && f.start ? f.start : null,
   });
 }
 
 const url = (key, f, extra = '') =>
-  `/api/section/${key}?ch=${store.ch}&imp=${f.imp.join(',')}&sort=${f.sort}${f.q ? `&q=${encodeURIComponent(f.q)}` : ''}${extra}`;
+  `/api/section/${key}?ch=${store.ch}&imp=${f.imp.join(',')}&sort=${f.sort}${f.q ? `&q=${encodeURIComponent(f.q)}` : ''}${f.sort === 'name' && f.start ? `&start=${encodeURIComponent(f.start)}` : ''}${extra}`;
 
 // Presence (design 4a): a track over chapters 1 → N with the span from first to last seen filled.
 function presenceCell(r) {
@@ -124,7 +128,9 @@ export async function section(key, params) {
         <span class="segmented">${['list', 'cards'].map(v => `<button type="button" data-view="${v}" aria-pressed="${f.view === v}">${enumLabel(v)}</button>`).join('')}</span>
       </div>
       <span class="showing" role="status">Showing ${data.total} of ${data.all}</span>
-    </div>`;
+    </div>
+    ${f.sort === 'name' && f.view === 'list' ? `<div class="az" role="group" aria-label="Names starting with">
+      <button type="button" data-start="" aria-pressed="${!f.start}">All</button>${LETTERS.map(l => `<button type="button" data-start="${l}" aria-pressed="${f.start === l}">${l}</button>`).join('')}</div>` : ''}`;
   // phones: the toolbar folds behind one button that says what is chosen
   const toggleText = () => `${f.imp.map(i => enumLabel(i)).join(', ')} · ${SORTS.find(([s2]) => s2 === f.sort)[1]}${f.view === 'cards' ? ' · Cards' : ''} · ${data.total} of ${data.all}`;
   const toggle = () => isTree ? '' : `<button type="button" class="filters-toggle" aria-expanded="false" aria-controls="section-toolbar">
@@ -151,7 +157,7 @@ export async function section(key, params) {
       const refresh = async () => {
         // the toolbar is re-rendered: keep keyboard focus on the same control
         const active = document.activeElement;
-        const keep = ['imp', 'sort', 'view'].map(k => active?.dataset?.[k] ? `[data-${k}="${active.dataset[k]}"]` : null).find(Boolean);
+        const keep = ['imp', 'sort', 'view', 'start'].map(k => active?.dataset?.[k] ? `[data-${k}="${active.dataset[k]}"]` : null).find(Boolean);
         saveFilters(key, f);
         data = await fetchData();
         rows = data.rows;
@@ -184,7 +190,9 @@ export async function section(key, params) {
           return refresh();
         }
         const sort = t.closest('[data-sort]');
-        if (sort) { f.sort = sort.dataset.sort; return refresh(); }
+        if (sort) { f.sort = sort.dataset.sort; if (f.sort !== 'name') f.start = ''; return refresh(); }
+        const letter = t.closest('[data-start]');
+        if (letter) { f.start = letter.dataset.start; return refresh(); }
         const view = t.closest('[data-view]');
         if (view) { f.view = view.dataset.view; return refresh(); }
         const more = t.closest('#rows-more');

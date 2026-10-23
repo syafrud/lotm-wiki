@@ -11,7 +11,7 @@ export const WIDTH = 96;
 // heading ("CHARACTER 1: Klein Moretti"), `fields` the canonical field order.
 export const SECTIONS = [
   { letter: 'A', key: 'characters', title: 'CHARACTERS', label: 'CHARACTER',
-    fields: ['name', 'true_name', 'title', 'aliases', 'kind', 'role', 'status', 'importance', 'headline', 'affiliations', 'titles', 'bio',
+    fields: ['name', 'true_name', 'title', 'aliases', 'kind', 'role', 'status', 'importance', 'headline', 'pathway', 'sequence_number', 'affiliations', 'titles', 'bio',
       'origin', 'origin_zhou_mingrui', 'origin_klein_moretti', 'physical_description', 'relationships_affiliations',
       'skills_knowledge', 'possessions', 'current_condition', 'history', 'notes', 'related'] },
   { letter: 'B', key: 'organizations', title: 'ORGANIZATIONS & FACTIONS', label: 'ORGANIZATION',
@@ -74,7 +74,7 @@ export const REF_DEFAULT_SECTION = {
   parent: { organizations: 'organizations', locations: 'locations' },
   base: { organizations: 'locations' },
   affiliations: { characters: 'organizations' },
-  pathway: { pathways_sequences: 'pathways_sequences' },
+  pathway: { pathways_sequences: 'pathways_sequences', characters: 'pathways_sequences' }, // a Beyonder's pathway (PLAN B8.2)
 };
 
 export function refSectionFor(field, sectionKey) {

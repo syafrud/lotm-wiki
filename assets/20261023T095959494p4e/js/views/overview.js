@@ -6,7 +6,7 @@ import { $, esc, chapterTitle, roman, volumeParts } from '../util.js';
 import { REPORTS } from '../mode.js';
 import { reportCounts } from '../components/reports.js';
 import { api } from '../api.js';
-import { store, sectionTitle, sectionOf, fieldLabel } from '../store.js';
+import { store, sectionTitle, sectionOf, fieldLabel, shortTitle } from '../store.js';
 import { entityLink, link, notesList, diaryEntryHtml } from '../components/ui.js';
 
 const LINES_PER_SECTION = 12;
@@ -58,6 +58,48 @@ function changesLedger(d) {
   return { html: groups, plus, minus };
 }
 
+// ---- the portal under the chapter (PLAN B8.6): section shortcuts, pathways, the Tarot Club and one
+// featured entry of this chapter; filled after the page shows, everything bounded by chapter n ----
+
+async function portal(root, d, n) {
+  const [counts, tree, tarot] = await Promise.all([
+    api(`/api/counts?ch=${n}`).catch(() => null),
+    api(`/api/pathways?ch=${n}`).catch(() => null),
+    api(`/api/entity/organizations/tarot_club/members?ch=${n}`).catch(() => null), // 404 before it exists
+  ]);
+  if (store.ch !== n) return;
+  const strip = $('#ov-shortcuts', root);
+  if (strip && counts) {
+    strip.innerHTML = counts.sections.filter(s => s.total).map(s => `<a class="shortcut" href="#/s/${s.key}?ch=${n}">
+      <span class="shortcut-name">${esc(shortTitle(s.key))}</span><span class="shortcut-n">${s.total}${s.new ? ` <span class="new-text">+${s.new}</span>` : ''}</span></a>`).join('');
+  }
+  const box = $('#ov-portal', root);
+  if (!box) return;
+  const blocks = [];
+  // featured: a major entry that changes in this chapter, the same one for everyone at this chapter
+  const touched = d.sections.flatMap(s => s.items.map(e => ({ ...e, section: s.key })));
+  const pool = touched.filter(e => e.importance === 'major').length ? touched.filter(e => e.importance === 'major') : touched.filter(e => e.importance === 'notable');
+  const f = pool.length ? pool[n % pool.length] : null;
+  if (f) {
+    blocks.push(`<section class="portal-block portal-featured"><h2 class="kicker">Featured in this chapter</h2>
+      <p class="featured-name">${entityLink(f.section, f.id, f.heading)}</p>
+      ${f.line ? `<p class="featured-line">${esc(f.line)}</p>` : ''}
+      <p class="muted">${esc(sectionTitle(f.section))} · ${link(`#/e/${f.section}/${encodeURIComponent(f.id)}`, 'Open the entry')}</p></section>`);
+  }
+  if (tarot?.current?.length) {
+    blocks.push(`<section class="portal-block portal-tarot"><h2 class="kicker">The Tarot Club</h2>
+      <ul class="tarot-grid">${tarot.current.map(m => `<li><a href="#/e/characters/${encodeURIComponent(m.id)}"><span class="tarot-code">${esc(m.title ?? '—')}</span><span class="tarot-name">${esc(m.name)}</span></a></li>`).join('')}</ul>
+      <p class="muted">${link('#/e/organizations/tarot_club?tab=members', 'Members and former members')}</p></section>`);
+  }
+  if (tree?.pathways?.length) {
+    blocks.push(`<section class="portal-block portal-pathways"><h2 class="kicker">Pathways known so far</h2>
+      <ul class="pathway-grid">${tree.pathways.map(p => `<li><a href="#/e/${p.section}/${encodeURIComponent(p.id)}?tab=sequences">
+        <span class="pathway-name">${esc(p.heading)}</span><span class="pathway-n">${p.sequences.length} of 10 Sequences known</span></a></li>`).join('')}</ul>
+      <p class="muted">${link('#/pathways', 'All pathways and their Sequences')}</p></section>`);
+  }
+  box.innerHTML = blocks.join('');
+}
+
 export async function overview() {
   const n = store.ch;
   const [d, qs] = await Promise.all([
@@ -92,13 +134,16 @@ export async function overview() {
         <h2 id="ov-appearing-h" class="kicker">Also appearing</h2>
         <div class="links">${appearing.map(a => `<span class="linkchip">${entityLink(a.section, a.id, a.heading)}</span>`).join('')}</div>
       </section>` : ''}
+      <nav class="ov-shortcuts" id="ov-shortcuts" aria-label="Sections"></nav>
       <aside class="ov-notes" aria-label="Notes on this chapter">
         <h2>Foreshadowing</h2>${notesList(d.foreshadowing, 'None noted.')}
         <h2>Open questions</h2>${notesList(d.open_questions, 'None noted.')}
         <p class="ov-links">${link('#/questions', `All open questions so far (${qs.total})`)} · ${link('#/since', 'What changed since you last read')}</p>
       </aside>
+      <section class="ov-portal" id="ov-portal" aria-label="The casebook"></section>
     </div>`,
     mount(root) {
+      portal(root, d, n);
       // readers' reports sent from this chapter (never from later ones)
       if (!REPORTS) return;
       reportCounts(n).then(({ chapter }) => {

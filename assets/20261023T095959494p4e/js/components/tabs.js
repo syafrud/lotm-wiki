@@ -21,6 +21,8 @@ export function initTabs(root, id, onSelect) {
       t.setAttribute('aria-selected', String(on));
       t.tabIndex = on ? 0 : -1;
       if (on && focus) t.focus();
+      // a row that scrolls sideways (phones): keep the chosen tab in view without moving the page
+      if (on && list.scrollWidth > list.clientWidth) list.scrollTo({ left: t.offsetLeft - (list.clientWidth - t.offsetWidth) / 2, behavior: 'smooth' });
     }
     panel.setAttribute('aria-labelledby', `${id}-${key}`);
     onSelect(key, panel);
