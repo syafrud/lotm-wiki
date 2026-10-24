@@ -5,13 +5,13 @@ import { esc } from '../util.js';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { entityLink } from '../components/ui.js';
-import { ladderHtml, SEQUENCE_0_CH } from './entity-topics.js';
+import { ladderHtml, ladderCount, SEQUENCE_0_CH } from './entity-topics.js';
 
 export async function pathwaysPage() {
   const t = await api(`/api/pathways?ch=${store.ch}`);
   const top = store.ch >= SEQUENCE_0_CH ? 0 : 1; // the highest Sequence the story has named
   const card = (g) => `<section class="pathway-card" id="pw-${esc(g.id)}">
-      <h2>${entityLink(g.section, g.id, g.heading)} <span class="count-tag">${g.sequences.length} of ${10 - top}</span></h2>
+      <h2>${entityLink(g.section, g.id, g.heading)} <span class="count-tag">${ladderCount(g)}</span></h2>
       ${ladderHtml(g)}</section>`;
   const named = t.pathways.filter(g => g.kind === 'pathway');
   const lines = t.pathways.filter(g => g.kind === 'line');

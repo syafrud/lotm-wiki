@@ -8,6 +8,7 @@ import { reportCounts } from '../components/reports.js';
 import { api } from '../api.js';
 import { store, sectionTitle, sectionOf, fieldLabel, shortTitle } from '../store.js';
 import { entityLink, link, notesList, diaryEntryHtml } from '../components/ui.js';
+import { ladderCount } from './entity-topics.js';
 
 const LINES_PER_SECTION = 12;
 
@@ -94,7 +95,7 @@ async function portal(root, d, n) {
   if (tree?.pathways?.length) {
     blocks.push(`<section class="portal-block portal-pathways"><h2 class="kicker">Pathways known so far</h2>
       <ul class="pathway-grid">${tree.pathways.map(p => `<li><a href="#/e/${p.section}/${encodeURIComponent(p.id)}?tab=sequences">
-        <span class="pathway-name">${esc(p.heading)}</span><span class="pathway-n">${p.sequences.length} of 10 Sequences known</span></a></li>`).join('')}</ul>
+        <span class="pathway-name">${esc(p.heading)}</span><span class="pathway-n">${ladderCount(p)} Sequences known</span></a></li>`).join('')}</ul>
       <p class="muted">${link('#/pathways', 'All pathways and their Sequences')}</p></section>`);
   }
   box.innerHTML = blocks.join('');

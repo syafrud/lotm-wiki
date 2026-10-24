@@ -1,5 +1,11 @@
 [
  {
+  "id": "2026-10-24T13:21Z",
+  "date": "2026-10-24",
+  "build": "20261024T1316051106lo",
+  "note": "Pathway and Sequence data for Volume 1 was re-read against the text: missing Sequence numbers were added (e.g. Arbiter), numbers that appeared too early now appear in the chapter that reveals them, and Sequences without a known number are shown on the ladder."
+ },
+ {
   "id": "2026-10-23T13:07Z",
   "date": "2026-10-23",
   "build": "20261023T130428735elc",

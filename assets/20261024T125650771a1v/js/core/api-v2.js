@@ -502,13 +502,14 @@ export function pathwayTree(db, n) {
   for (const [id, x] of e) if (x.kind !== 'pathway' && x.pathway && target(x.pathway) && target(x.pathway) !== id) pointedAt.add(rootOf(id));
   const unplaced = [];
   for (const [id, x] of e) {
-    if (x.kind !== 'sequence' || num(x) == null) continue;
+    if (x.kind !== 'sequence') continue;
     const root = rootOf(id);
-    const item = { seq: num(x), section: S, id, heading: headingAt(ids, S, id, n) ?? id }; // `seq`, not `n`: n is a chapter
+    // `seq`, not `n`: n is a chapter; null while the story has not said its number (Arbiter, ch 114)
+    const item = { seq: num(x), section: S, id, heading: headingAt(ids, S, id, n) ?? id };
     if (root === id && !pointedAt.has(id) && e.get(id).kind !== 'pathway') unplaced.push(item);
     else group(root).sequences.push(item);
   }
-  const byNum = (a, b) => b.seq - a.seq || a.heading.localeCompare(b.heading);
+  const byNum = (a, b) => (b.seq ?? -1) - (a.seq ?? -1) || a.heading.localeCompare(b.heading);
   const out = [...groups.values()].map(g => ({ ...g, sequences: g.sequences.sort(byNum) }))
     .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'pathway' ? -1 : 1) || a.heading.localeCompare(b.heading));
   return { ch: n, pathways: out, unplaced: unplaced.sort(byNum), rootOf: (id) => (e.has(id) ? rootOf(id) : null) };

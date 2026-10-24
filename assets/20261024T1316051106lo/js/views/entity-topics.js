@@ -141,6 +141,9 @@ async function sequencesPanel(o) {
 
 const seeAllPathways = () => `<a href="#/pathways">All pathways</a>`;
 
+// "3 of 9": the numbered Sequences known, out of the ranks the story has named so far
+export const ladderCount = (g) => `${g.sequences.filter(s => s.seq != null).length} of ${store.ch >= SEQUENCE_0_CH ? 10 : 9}`;
+
 export function ladderHtml(g, { highlight = null } = {}) {
   const by = new Map();
   for (const s of g.sequences) (by.get(s.seq) ?? by.set(s.seq, []).get(s.seq)).push(s);
@@ -153,6 +156,10 @@ export function ladderHtml(g, { highlight = null } = {}) {
     html += `<tr class="${list.some(s => s.id === highlight) ? 'here' : ''}${list.length ? '' : ' unknown'}"><td class="seq-n">${n}</td>
       <td>${list.length ? list.map(s => entityLink(s.section, s.id, s.heading.replace(/\s*\(Sequence \d\)$/, ''))).join(' · ') : `<span class="sealed">not known at ch ${store.ch}</span>`}</td></tr>`;
   }
+  // Sequences of this pathway whose number the story has not given yet
+  const loose = by.get(null) ?? [];
+  if (loose.length) html += `<tr class="band"><th colspan="2" scope="colgroup">Number not known yet</th></tr>
+    <tr class="${loose.some(s => s.id === highlight) ? 'here' : ''}"><td class="seq-n">?</td><td>${loose.map(s => entityLink(s.section, s.id, s.heading)).join(' · ')}</td></tr>`;
   return `<table class="ladder-table"><thead><tr><th scope="col">Seq.</th><th scope="col">Name</th></tr></thead><tbody>${html}</tbody></table>`;
 }
 
