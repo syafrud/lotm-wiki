@@ -1,5 +1,11 @@
 [
  {
+  "id": "2026-10-31T00:33Z",
+  "date": "2026-10-31",
+  "build": "20261031T003007849tyk",
+  "note": "Every Volume 1 fact was re-read against its chapter: facts that appeared too early now appear in the chapter that reveals them, missing details were added, and details the text does not support were removed."
+ },
+ {
   "id": "2026-10-24T13:21Z",
   "date": "2026-10-24",
   "build": "20261024T1316051106lo",
