@@ -1,14 +1,14 @@
 // Optional reader accounts (PLAN K9), on the static site's Supabase (scripts/supabase/user-data.sql).
-// Signing in sends a link to the reader's email (Supabase Auth, PKCE: the link comes back with
-// ?code=…, swapped here for a session). Signed in, the reading chapter, the settings and private
-// notes follow the reader to other devices; signed out, everything keeps working from this browser.
-// Only the anon key is in the page; row level security keeps every row to its owner.
+// Email and password (Supabase Auth; no email is ever sent). Signed in, the reading chapter, the
+// settings and private notes follow the reader to other devices; signed out, everything keeps
+// working from this browser. Only the anon key is in the page; row level security keeps every row
+// to its owner.
 import { storage } from '../util.js';
-import { REPORTS_REMOTE } from '../mode.js';
+import { REPORTS_REMOTE, ACCOUNTS_ON, CAPTCHA_KEY } from '../mode.js';
 
-export const ACCOUNTS = !!REPORTS_REMOTE;
+export const ACCOUNTS = ACCOUNTS_ON;
+export const PASSWORD_MIN = 10; // keep in step with Supabase: Authentication → Sign In / Providers
 const KEY = 'wiki.session';
-const VERIFIER = 'wiki.pkce';
 let session = null; // { access_token, refresh_token, expires_at (s), email }
 const listeners = new Set();
 
@@ -47,15 +47,38 @@ async function fresh() {
   catch { saveSession(null); }
 }
 
-const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const credentials = (email, password, captcha) => ({
+  email: String(email).trim(), password,
+  ...(captcha ? { gotrue_meta_security: { captcha_token: captcha } } : {}),
+});
 
-// email → a sign-in link; it opens the wiki again at `back` (this page) with ?code=…
-export async function sendSignInLink(email) {
-  const verifier = [...crypto.getRandomValues(new Uint8Array(32))].map(b => b.toString(16).padStart(2, '0')).join('');
-  const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
-  storage.set(VERIFIER, verifier);
-  const back = `${location.origin}${location.pathname}`;
-  await call('/auth/v1/otp', { method: 'POST', query: `?redirect_to=${encodeURIComponent(back)}`, body: { email: String(email).trim(), create_user: true, code_challenge: challenge, code_challenge_method: 's256' } });
+// The password goes straight to Supabase over https (it stores a hash) and is never kept here.
+export async function signIn(email, password, captcha = '') {
+  saveSession(await call('/auth/v1/token', { method: 'POST', query: '?grant_type=password', body: credentials(email, password, captcha) }));
+}
+
+export async function signUp(email, password, captcha = '') {
+  const s = await call('/auth/v1/signup', { method: 'POST', body: credentials(email, password, captcha) });
+  if (!s?.access_token) throw new Error('The account needs an email confirmation, which this wiki does not send ("Confirm email" must be off in Supabase).');
+  saveSession(s);
+}
+
+// Cloudflare Turnstile on the sign-in form, when the site has a key (config/site.json): with no
+// confirmation email it is what keeps scripts from making accounts. → { token(), reset() } or null
+let turnstile = null;
+export async function mountCaptcha(box) {
+  if (!CAPTCHA_KEY) return null;
+  turnstile ??= new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    s.onload = () => resolve(window.turnstile);
+    s.onerror = reject;
+    document.head.append(s);
+  });
+  const t = await turnstile;
+  let token = '';
+  const id = t.render(box, { sitekey: CAPTCHA_KEY, callback: (v) => { token = v; }, 'expired-callback': () => { token = ''; } });
+  return { token: () => token, reset: () => { token = ''; t.reset(id); } }; // a token works once
 }
 
 export async function signOut() {
@@ -63,24 +86,11 @@ export async function signOut() {
   saveSession(null);
 }
 
-// At start: a saved session, or the ?code= of a sign-in link (then removed from the address).
-// → { link: true when the page was opened from a sign-in link, message }
+// At start: the session saved in this browser, if any
 export async function initAccount() {
-  if (!ACCOUNTS) return { link: false, message: '' };
+  if (!ACCOUNTS) return;
   try { session = JSON.parse(storage.get(KEY) || 'null'); } catch { session = null; }
-  const params = new URLSearchParams(location.search);
-  const code = params.get('code');
-  const failed = params.get('error_description');
-  if (code || failed) history.replaceState(history.state, '', `${location.pathname}${location.hash}`);
-  if (failed) return { link: true, message: `Signing in did not work: ${failed}` };
-  if (code) {
-    try { saveSession(await call('/auth/v1/token', { method: 'POST', query: '?grant_type=pkce', body: { auth_code: code, code_verifier: storage.get(VERIFIER) ?? '' } })); }
-    catch (e) { return { link: true, message: `Signing in did not work: ${e.message}. Ask for a new link (on this device).` }; }
-    storage.remove(VERIFIER);
-    return { link: true, message: 'You are signed in.' };
-  }
   if (session) await fresh();
-  return { link: false, message: '' };
 }
 
 // ---- the reader's rows ----

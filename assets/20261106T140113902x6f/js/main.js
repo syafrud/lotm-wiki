@@ -11,12 +11,11 @@
 import { $, storage, isTyping } from './util.js';
 import { api } from './api.js';
 import { store, noteMove } from './store.js';
-import { initPicker, loadChapters, syncPickers, stepChapter, sheetOpen, closeSheet } from './components/picker.js';
+import { initPicker, loadChapters, syncPickers, stepChapter, setChapter, sheetOpen, closeSheet } from './components/picker.js';
 import { initDrawer, drawerOpen, closeDrawer } from './components/sidebar.js';
 import { initModal, modalOpen, closeDisclaimer } from './components/modal.js';
 import { initConfirm, confirmOpen, closeConfirm, confirmChapter, askBeforeJump } from './components/confirm.js';
 import { ACCOUNTS, initAccount, signedIn, onAccountChange, loadSettings, saveSettings, loadProgress, saveProgress } from './components/account.js';
-import { setAccountMessage } from './views/pages.js';
 import { renderSidebar } from './components/sidebar.js';
 import { render, route } from './router.js';
 import { initUpdates } from './components/updates.js';
@@ -64,13 +63,14 @@ function initKeyboard() {
 
 // The account's settings come to this browser (or this browser's go up, the first time); the
 // account's chapter is offered when it is further on — through the same check as any jump ahead.
-async function syncAccount() {
+async function syncAccount({ live = false } = {}) {
   try {
     const s = await loadSettings();
     if (s) for (const [key, on] of [['wiki.arrows', s.arrow_keys], ['wiki.confirmJump', s.confirm_jump]]) { if (on) storage.remove(key); else storage.set(key, 'off'); }
     else await saveSettings({ arrow_keys: storage.get('wiki.arrows') !== 'off', confirm_jump: storage.get('wiki.confirmJump') !== 'off' });
     const remote = await loadProgress();
     if (remote > store.ch && store.chapters.some(c => c.n === remote) && (!askBeforeJump() || await confirmChapter(remote, { from: store.ch }))) {
+      if (live) return void setChapter(remote, { confirmed: true }); // signed in on an open page
       store.ch = remote;
       history.replaceState(history.state, '', location.hash.replace(/([?&]ch=)\d+/, `$1${remote}`));
     } else if (remote !== store.ch) saveProgress(store.ch);
@@ -117,12 +117,8 @@ async function boot() {
     store.ch = saved;
     history.replaceState(history.state, '', location.hash.replace(/([?&]ch=)\d+/, `$1${saved}`));
   }
-  // PLAN K9: an optional account; back from a sign-in link the account page says how it went
-  const signIn = await initAccount();
-  if (signIn.link) {
-    setAccountMessage(signIn.message);
-    history.replaceState(history.state, '', `#/account?ch=${store.ch}`);
-  }
+  // PLAN K9: an optional account
+  await initAccount();
   if (signedIn()) await syncAccount();
   // a new session opened further on than where the last one ended
   if (saved && chapters.some(c => c.n === saved)) noteMove(saved, store.ch);
@@ -136,7 +132,13 @@ async function boot() {
   initModal();
   initUpdates().catch(() => {}); // the notes are a nicety: never hold the page up
   showAccountLink();
-  onAccountChange(() => { showAccountLink(); renderSidebar(route().path); });
+  let wasIn = signedIn();
+  onAccountChange((on) => {
+    showAccountLink();
+    renderSidebar(route().path);
+    if (on && !wasIn) syncAccount({ live: true }); // a token refresh is no new sign-in
+    wasIn = on;
+  });
   $('#skip-link').addEventListener('click', () => ($('h1', content) ?? content).focus());
 
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';

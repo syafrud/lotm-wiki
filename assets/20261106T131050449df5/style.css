@@ -900,7 +900,7 @@ html.theme-fading, html.theme-fading *, html.theme-fading *::before, html.theme-
 .topbar-link[hidden] { display: none; }
 @media (max-width: 760px) { .topbar-link { display: none; } }
 .account-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 14px 0; }
-.account-form input[type=email] { flex: 1 1 260px; min-height: 44px; padding: 0 12px; font: inherit; border: 1px solid var(--rule); background: var(--paper2); color: inherit; }
+.account-form input[type=email], .account-form input[type=password] { flex: 1 1 240px; min-height: 44px; padding: 0 12px; font: inherit; border: 1px solid var(--rule); background: var(--paper2); color: inherit; }
 .my-notes .note-row { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--hair); }
 .my-notes .note-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .note-box textarea { width: 100%; min-height: 90px; padding: 10px; font: inherit; border: 1px solid var(--rule); background: var(--paper2); color: inherit; }

@@ -3,10 +3,10 @@ import { $, esc, storage } from '../util.js';
 import { store } from '../store.js';
 import { chip, link } from '../components/ui.js';
 import { DISCLAIMER_HTML, showDisclaimer, resetDisclaimer } from '../components/modal.js';
-import { STATIC, REPORTS } from '../mode.js';
+import { STATIC, REPORTS, CAPTCHA_KEY } from '../mode.js';
 import { sendReport, listReports } from '../components/reports.js';
 import { fetchUpdates, noteHtml } from '../components/updates.js';
-import { ACCOUNTS, signedIn, accountEmail, sendSignInLink, signOut, saveSettings } from '../components/account.js';
+import { ACCOUNTS, PASSWORD_MIN, signedIn, accountEmail, signIn, signUp, signOut, saveSettings, mountCaptcha } from '../components/account.js';
 import { mountNotes } from '../components/notes.js';
 
 // A static site exported without a reports address has nowhere to send them.
@@ -73,48 +73,54 @@ export function about() {
   };
 }
 
-// #/account (PLAN K9): optional. Signed out: what an account is for and the email form; signed in:
+// #/account (PLAN K9): optional. Signed out: what an account is for and the sign-in form; signed in:
 // the address, Sign out and every private note.
-let accountMessage = '';
-export const setAccountMessage = (m) => { accountMessage = m ?? ''; };
 export function account() {
   if (!ACCOUNTS) {
     return { title: 'Account', html: '<h1 tabindex="-1">Account</h1><p class="empty">Accounts are only on the public wiki. Everything here is kept in this browser.</p>' };
   }
   const body = (root) => {
     const box = $('#account-body', root);
-    const message = accountMessage ? `<p class="hint" role="status">${esc(accountMessage)}</p>` : '';
-    accountMessage = '';
+    $('h1', root).textContent = signedIn() ? 'My account & notes' : 'Sign in (optional)';
     if (!signedIn()) {
-      box.innerHTML = `${message}
+      box.innerHTML = `
         <p>You do not need an account: the wiki remembers your chapter and settings in this browser. Sign in only if you want them —
         and private notes — on your other devices too.</p>
-        <p class="muted">There is no password: you get a sign-in link by email. The wiki keeps your email address, your chapter,
-        your two settings and the notes you write — nothing else, and only you can read them.</p>
+        <p class="muted">The wiki keeps your email address, your chapter, your two settings and the notes you write — nothing else,
+        and only you can read them. It sends no email, so a forgotten password cannot be reset from here: keep it in a password manager,
+        and use a password you use nowhere else.</p>
         <form class="account-form" id="account-form" novalidate>
           <label class="sr-only" for="account-email">Email address</label>
-          <input id="account-email" type="email" autocomplete="email" required placeholder="you@example.com" maxlength="254">
-          <button class="btn btn-outline" type="submit">Email me a sign-in link</button>
+          <input id="account-email" type="email" autocomplete="username" required placeholder="you@example.com" maxlength="254">
+          <label class="sr-only" for="account-password">Password</label>
+          <input id="account-password" type="password" autocomplete="current-password" required placeholder="Password (at least ${PASSWORD_MIN} characters)" maxlength="72">
+          <div id="account-captcha"></div>
+          <button class="btn btn-outline" type="submit" data-do="in">Sign in</button>
+          <button class="btn btn-quiet" type="submit" data-do="up">Create account</button>
         </form>
         <p class="hint" id="account-status" aria-live="polite"></p>`;
+      const captcha = mountCaptcha($('#account-captcha', box)).catch(() => null);
       $('#account-form', box).addEventListener('submit', async (ev) => {
         ev.preventDefault();
-        const input = $('#account-email', box);
-        const status = $('#account-status', box);
-        if (!input.checkValidity() || !input.value.trim()) { status.textContent = 'Please enter an email address.'; input.focus(); return; }
-        const button = ev.submitter ?? $('button', ev.target);
-        button.disabled = true;
+        const email = $('#account-email', box), password = $('#account-password', box), status = $('#account-status', box);
+        const creating = ev.submitter?.dataset.do === 'up';
+        if (!email.checkValidity() || !email.value.trim()) { status.textContent = 'Please enter an email address.'; email.focus(); return; }
+        if (password.value.length < (creating ? PASSWORD_MIN : 1)) { status.textContent = `Please enter a password of at least ${PASSWORD_MIN} characters.`; password.focus(); return; }
+        const check = await captcha;
+        if (CAPTCHA_KEY && !check?.token()) { status.textContent = 'Please finish the check above the buttons first.'; return; }
+        for (const b of ev.target.querySelectorAll('button')) b.disabled = true;
         try {
-          await sendSignInLink(input.value);
-          status.textContent = `A sign-in link is on its way to ${input.value.trim()}. Open it on this device.`;
+          await (creating ? signUp : signIn)(email.value, password.value, check?.token() ?? '');
+          body(root);
         } catch (e) {
-          status.textContent = e.status === 429 ? 'Too many sign-in emails just now; please try again later.' : `That did not work: ${e.message}`;
-          button.disabled = false;
+          status.textContent = e.status === 429 ? 'Too many tries just now; please wait a few minutes.' : e.status === 400 && !creating ? 'Wrong email or password.' : `That did not work: ${e.message}`;
+          check?.reset();
+          for (const b of ev.target.querySelectorAll('button')) b.disabled = false;
         }
       });
       return;
     }
-    box.innerHTML = `${message}
+    box.innerHTML = `
       <p>Signed in as <strong>${esc(accountEmail() ?? 'you')}</strong>. Your chapter and settings follow you to your other devices.</p>
       <p><button class="btn btn-quiet" type="button" id="account-signout">Sign out</button></p>
       <div id="account-notes"></div>`;

@@ -1,12 +1,12 @@
 {
- "id": "20261106T131050449df5",
- "built_at": "2026-11-06T13:10:51.940Z",
+ "id": "20261106T140113902x6f",
+ "built_at": "2026-11-06T14:01:15.194Z",
  "chapters": 321,
- "facts": 43660,
+ "facts": 43664,
  "format": 4,
- "file": "wiki-20261106T131050449df5.db.gz",
+ "file": "wiki-20261106T140113902x6f.db.gz",
  "db_bytes": 9236480,
- "gz_bytes": 2951079,
+ "gz_bytes": 2951286,
  "indexes": [
   "CREATE INDEX chapter_notes_ch ON chapter_notes(ch)",
   "CREATE INDEX diary_entries_ch ON diary_entries(ch)",

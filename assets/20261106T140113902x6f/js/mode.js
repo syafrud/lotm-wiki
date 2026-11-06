@@ -10,6 +10,9 @@ export const REPORTS_REMOTE = STATIC && meta('wiki-reports-url')
   : null;
 // can readers send and read reports here?
 export const REPORTS = !STATIC || !!REPORTS_REMOTE;
+// optional reader accounts: on the same Supabase, once the owner has set them up (config/site.json)
+export const ACCOUNTS_ON = !!REPORTS_REMOTE && meta('wiki-accounts') === 'on';
+export const CAPTCHA_KEY = meta('wiki-captcha'); // Cloudflare Turnstile site key, public by design
 
 // CSS hides `.needs-server` elements on the static site and `.needs-reports` where reports are off.
 document.documentElement.dataset.mode = STATIC ? 'static' : 'server';

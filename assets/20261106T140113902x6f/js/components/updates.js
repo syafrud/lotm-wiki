@@ -20,6 +20,16 @@ export async function fetchUpdates() {
   }
 }
 
+// the See more lines of one update, in their own file (data/updates.json stays small)
+export async function fetchUpdateDetails(build) {
+  try {
+    const r = await fetch(`data/update-${build}.json`);
+    return r.ok ? await r.json() : [];
+  } catch {
+    return [];
+  }
+}
+
 export const noteHtml = (note) => String(note).split('\n').filter(l => l.trim()).map(l => `<span class="update-line">${esc(l)}</span>`).join(' ');
 
 function show(html) {
