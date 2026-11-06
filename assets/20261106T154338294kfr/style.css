@@ -558,7 +558,17 @@ body.sheet-open .chapter-picker { display: flex; }
 .reports { display: grid; gap: 10px; margin-bottom: 18px; }
 .report-item { border: 1px solid var(--hair); background: var(--paper2); padding: 10px 12px; }
 .report-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 6px; }
-.report-message { margin: 0; white-space: pre-wrap; line-height: 1.5; }
+.filters { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 12px; }
+.filters a.active { font-weight: 600; }
+.filters .count { font: 12px var(--mono); color: var(--brass); margin-left: 3px; }
+.report-message { margin: 0; white-space: pre-wrap; line-height: 1.5; overflow-wrap: anywhere; }
+.report-image { display: block; max-width: min(100%, 360px); max-height: 280px; margin-top: 8px; border: 1px solid var(--hair); }
+.report-reply { margin: 8px 0 0; padding-left: 10px; border-left: 3px solid var(--brass); white-space: pre-wrap; }
+.report-update { margin: 6px 0 0; }
+.admin-controls { display: grid; gap: 6px; max-width: 560px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hair); }
+.admin-controls label { font-size: 13px; color: var(--muted); }
+.admin-controls select, .admin-controls textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--rule); background: var(--paper2); color: var(--ink); width: 100%; }
+.admin-controls textarea { resize: vertical; }
 .update-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 20px; background: var(--green-soft); border-bottom: 1px solid var(--green); color: var(--ink); font-size: 15px; }
 .update-banner[hidden] { display: none; }
 .update-text { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
@@ -741,7 +751,7 @@ body.sheet-open .chapter-picker { display: flex; }
   .shelf { height: 120px; gap: 6px; }
   #disclaimer-ch { height: 44px; }
   .modal-actions .btn { width: 100%; }
-  .modal-pick input, .report-form input, .report-form select, .report-form textarea, .name-filter input { min-height: 44px; }
+  .modal-pick input, .report-form input, .report-form select, .report-form textarea, .admin-controls select, .name-filter input { min-height: 44px; }
 }
 
 /* ---- wide screens: the content fills the space next to the sidebar (no empty band on the right) ---- */

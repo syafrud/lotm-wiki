@@ -10,16 +10,18 @@ export const ACCOUNTS = ACCOUNTS_ON;
 export const PASSWORD_MIN = 10; // keep in step with Supabase: Authentication → Sign In / Providers
 const KEY = 'wiki.session';
 let session = null; // { access_token, refresh_token, expires_at (s), email }
+let admin = false;
 const listeners = new Set();
 
 export const signedIn = () => !!session;
 export const accountEmail = () => session?.email ?? null;
+export const isAdmin = () => admin; // shows the dashboard; what protects the reports is row level security
 export const onAccountChange = (fn) => listeners.add(fn);
 const changed = () => { for (const fn of listeners) fn(signedIn()); };
 
 function saveSession(s) {
   session = s ? { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at ?? Math.floor(Date.now() / 1000) + (s.expires_in ?? 3600), email: s.user?.email ?? s.email ?? null } : null;
-  if (session) storage.set(KEY, JSON.stringify(session)); else storage.remove(KEY);
+  if (session) storage.set(KEY, JSON.stringify(session)); else { storage.remove(KEY); admin = false; }
   changed();
 }
 
@@ -55,6 +57,7 @@ const credentials = (email, password, captcha) => ({
 // The password goes straight to Supabase over https (it stores a hash) and is never kept here.
 export async function signIn(email, password, captcha = '') {
   saveSession(await call('/auth/v1/token', { method: 'POST', query: '?grant_type=password', body: credentials(email, password, captcha) }));
+  await checkAdmin();
 }
 
 export async function signUp(email, password, captcha = '') {
@@ -91,6 +94,13 @@ export async function initAccount() {
   if (!ACCOUNTS) return;
   try { session = JSON.parse(storage.get(KEY) || 'null'); } catch { session = null; }
   if (session) await fresh();
+  if (session) await checkAdmin();
+}
+
+// wiki_admins only ever returns the reader's own row
+async function checkAdmin() {
+  try { admin = (await call('/rest/v1/wiki_admins', { auth: true, query: '?select=user_id' })).length > 0; } catch { admin = false; }
+  if (admin) changed();
 }
 
 // ---- the reader's rows ----
@@ -123,4 +133,19 @@ export function addNote({ ch, section = null, id = null, text }) {
 }
 export function deleteNote(noteId) {
   return call('/rest/v1/reader_notes', { method: 'DELETE', auth: true, query: `?id=eq.${Number(noteId)}` });
+}
+
+// ---- the admin's dashboard (#/admin): the database refuses all of this to anyone else ----
+
+// shortcut: the newest 1000 (Supabase's page size), add paging if there are ever more
+export function adminReports() {
+  return call('/rest/v1/reports', { auth: true, query: '?select=*&order=created_at.desc&limit=1000' });
+}
+// fields: any of { status, update_id, reply, image_path }
+export function updateReport(id, fields) {
+  return call('/rest/v1/reports', { method: 'PATCH', auth: true, query: `?id=eq.${Number(id)}`, body: fields });
+}
+export async function removeReportImage(id, name) {
+  await call('/storage/v1/object/report-images', { method: 'DELETE', auth: true, body: { prefixes: [name] } });
+  await updateReport(id, { image_path: null });
 }

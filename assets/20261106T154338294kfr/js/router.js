@@ -13,6 +13,7 @@ import { section } from './views/section.js';
 import { entity } from './views/entity.js';
 import { search } from './views/search.js';
 import { about, report, reports, updateDetails, account } from './views/pages.js';
+import { admin } from './views/admin.js';
 import { questions, since } from './views/reading.js';
 import { volume } from './views/volume.js';
 import { pathwaysPage } from './views/pathways.js';
@@ -45,6 +46,7 @@ function viewFor(path, params) {
   if (parts[0] === 'updates' && parts[1] && parts.length === 2) return updateDetails(decodeURIComponent(parts[1]));
   if (path === '/report') return report(params);
   if (path === '/reports') return reports(params);
+  if (path === '/admin') return admin();
   return notFoundHtml();
 }
 

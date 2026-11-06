@@ -3,8 +3,8 @@ import { $, esc, storage } from '../util.js';
 import { store } from '../store.js';
 import { chip, link } from '../components/ui.js';
 import { DISCLAIMER_HTML, showDisclaimer, resetDisclaimer } from '../components/modal.js';
-import { STATIC, REPORTS, CAPTCHA_KEY } from '../mode.js';
-import { sendReport, listReports } from '../components/reports.js';
+import { STATIC, REPORTS, REPORTS_REMOTE, CAPTCHA_KEY } from '../mode.js';
+import { sendReport, listReports, listHistory, reportImage, STATUS, FINISHED } from '../components/reports.js';
 import { fetchUpdates, fetchUpdateDetails, noteHtml } from '../components/updates.js';
 import { ACCOUNTS, PASSWORD_MIN, signedIn, accountEmail, signIn, signUp, signOut, saveSettings, mountCaptcha } from '../components/account.js';
 import { mountNotes } from '../components/notes.js';
@@ -161,6 +161,12 @@ export function updateDetails(id) {
           items.push(`<li>${esc(l.slice(2))}</li>`);
         }
         flush();
+        // the reports this update answers, from chapters already read; their text is not repeated here
+        const answered = (await listHistory(store.ch).catch(() => [])).filter(r => r.update === id);
+        const thanks = [...new Set(answered.filter(r => r.status === 'done').map(r => r.credit || 'a reader'))];
+        const unchanged = answered.filter(r => r.status === 'not_changed').length;
+        if (thanks.length) out.push(`<h2>Thanks to</h2><p class="update-thanks">${esc(thanks.join(', '))}</p>`);
+        if (unchanged) out.push(`<h2>Checked, no change needed</h2><p class="update-unchanged">${unchanged} report${unchanged === 1 ? '' : 's'}, answered in the ${link('#/reports?view=history', 'report history')}.</p>`);
         box.innerHTML = `<h1 tabindex="-1">Update of ${esc(u.date)}</h1><p class="lede">${noteHtml(u.note)}</p>${out.join('')}
           ${hidden ? `<p class="muted">${hidden} more line${hidden === 1 ? '' : 's'} about chapters after ch ${store.ch} stay hidden until you read them.</p>` : ''}`;
       });
@@ -190,6 +196,12 @@ export function report(params) {
         <label for="report-contact">Contact (optional)</label>
         <input id="report-contact" type="text" maxlength="200" placeholder="email or anything to reach you" aria-describedby="report-contact-hint">
         <p class="hint" id="report-contact-hint">Only used to follow up on your report. It is never shown publicly.</p>
+        <label for="report-credit">Name to credit (optional)</label>
+        <input id="report-credit" type="text" maxlength="80" aria-describedby="report-credit-hint">
+        <p class="hint" id="report-credit-hint">Shown publicly if this report leads to a fix. Leave it empty to stay anonymous.</p>
+        ${!REPORTS_REMOTE ? '' : `<label for="report-image">Picture (optional)</label>
+        <input id="report-image" type="file" accept="image/png,image/jpeg,image/webp" aria-describedby="report-image-hint">
+        <p class="hint" id="report-image-hint">Optional. Shown publicly after we read your report, so leave out anything from later chapters.</p>`}
         <div class="hp" aria-hidden="true"><label for="report-website">Leave this empty</label><input id="report-website" type="text" tabindex="-1" autocomplete="off"></div>
         <div class="form-actions">
           <button class="btn" type="submit">Send report</button>
@@ -206,16 +218,19 @@ export function report(params) {
         status.className = 'form-status';
         button.disabled = true;
         try {
-          await sendReport({
+          const sent = await sendReport({
             ch: $('#report-ch', root).value,
             category: $('#report-category', root).value,
             where: $('#report-where', root).value,
             message: $('#report-message', root).value,
             contact: $('#report-contact', root).value,
+            credit: $('#report-credit', root).value,
+            image: $('#report-image', root)?.files[0],
             website: $('#report-website', root).value,
           });
           $('#report-message', root).value = '';
-          status.innerHTML = `Thank you — your report was saved. ${link('#/reports', 'See the reports')}`;
+          if ($('#report-image', root)) $('#report-image', root).value = '';
+          status.innerHTML = `Thank you — your report was saved${sent?.imageFailed ? ', but the picture could not be sent' : ''}. ${link('#/reports', 'See the reports')}`;
           status.className = 'form-status ok';
         } catch (err) {
           status.textContent = err.message;
@@ -229,13 +244,18 @@ export function report(params) {
 }
 
 // Public list of what readers have reported, grouped by category (spoiler reports are never listed).
+// Open: still being looked at. History (?view=history): finished, kept for good, each with its update.
 export async function reports(params) {
   if (!REPORTS) return noReports('Reports');
-  const all = await listReports(store.ch);
+  const [all, past] = await Promise.all([listReports(store.ch), listHistory(store.ch)]);
   // ?here=1: only those sent from the chapter being read; ?where=…: only those about one page
   const here = params.get('here') === '1';
   const about = params.get('where') ?? '';
-  const list = all.filter(r => (!here || r.ch === store.ch) && (!about || r.where === about));
+  const scoped = (rows) => rows.filter(r => (!here || r.ch === store.ch) && (!about || r.where === about));
+  const open = scoped(all).filter(r => !FINISHED.includes(r.status));
+  const finished = scoped(past);
+  const history = params.get('view') === 'history';
+  const list = history ? finished : open;
   const filter = params.get('g') ?? '';
   const listed = REPORT_CATEGORIES.filter(c => c.key !== 'spoiler');
   const shown = listed.filter(c => !filter || c.key === filter);
@@ -243,14 +263,15 @@ export async function reports(params) {
   const note = `Only reports sent by readers up to chapter ${store.ch} are shown, and reports marked as spoilers never are.`
     + (here ? ` Showing the ones from chapter ${store.ch}.` : '') + (about ? ` Showing the ones about “${esc(about)}”.` : '')
     + (here || about ? ` ${link('#/reports', 'Show all reports')}` : '');
-  const reportsHash = (g) => {
+  const reportsHash = (g, inHistory = history) => {
     const q = new URLSearchParams();
+    if (inHistory) q.set('view', 'history');
     if (g) q.set('g', g);
     if (here) q.set('here', '1');
     if (about) q.set('where', about);
     return `#/reports${q.size ? `?${q}` : ''}`;
   };
-  if (!list.length) {
+  if (!open.length && !finished.length) {
     return {
       title: 'Reports',
       html: `
@@ -274,10 +295,13 @@ export async function reports(params) {
             <span class="chip kind">${esc(c.label)}</span>
             ${r.ch != null ? chip(r.ch) : ''}
             ${r.where ? `<span class="muted">${esc(r.where)}</span>` : ''}
-            ${r.status === 'fixed' ? '<span class="tag new">fixed</span>' : ''}
+            ${STATUS[r.status] ? `<span class="tag${FINISHED.includes(r.status) ? ' new' : ''}">${esc(STATUS[r.status])}</span>` : ''}
             <span class="muted">${esc(when(r.at))}</span>
           </div>
           <p class="report-message">${esc(r.message)}</p>
+          ${r.image ? `<a href="${esc(reportImage(r.image))}" target="_blank" rel="noopener"><img class="report-image" src="${esc(reportImage(r.image))}" alt="Picture sent with this report" loading="lazy"></a>` : ''}
+          ${r.reply ? `<p class="report-reply">${esc(r.reply)}</p>` : ''}
+          ${r.update ? `<p class="report-update">${link(`#/updates/${encodeURIComponent(r.update)}`, 'See more')}</p>` : ''}
         </div>`).join('')}</div>`;
   }).join('');
   return {
@@ -285,6 +309,10 @@ export async function reports(params) {
     html: `
       <h1 tabindex="-1">Reports</h1>
       <p class="subtitle">${list.length} report${list.length === 1 ? '' : 's'} from readers. Contact details are never shown here. ${note}</p>
+      ${!REPORTS_REMOTE ? '' : `<nav class="filters" aria-label="Open or finished reports">
+        ${link(reportsHash(filter, false), `Open <span class="count">${open.length}</span>`, !history ? 'active' : '', { current: !history })}
+        ${link(reportsHash(filter, true), `History <span class="count">${finished.length}</span>`, history ? 'active' : '', { current: history })}
+      </nav>`}
       <nav class="filters" aria-label="Report categories">
         ${link(reportsHash(''), 'All', !filter ? 'active' : '', { current: !filter })}
         ${listed.map(c => link(reportsHash(c.key), `${esc(c.label)} <span class="count">${count(c.key)}</span>`, filter === c.key ? 'active' : '', { current: filter === c.key })).join('')}

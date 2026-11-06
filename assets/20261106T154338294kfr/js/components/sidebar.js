@@ -5,7 +5,7 @@ import { store, sectionTitle } from '../store.js';
 import { link } from './ui.js';
 import { currentVolumeIndex } from '../views/volume.js';
 import { REPORTS } from '../mode.js';
-import { ACCOUNTS, signedIn } from './account.js';
+import { ACCOUNTS, signedIn, isAdmin } from './account.js';
 
 const sidebar = $('#sidebar');
 import { SHORT } from '../store.js';
@@ -42,6 +42,7 @@ export async function renderSidebar(path) {
     ${item('#/about', 'About', path === '/about')}
     ${!REPORTS ? '' : item('#/report', 'Report an error', path === '/report')}
     ${!REPORTS ? '' : item('#/reports', 'Reports', path === '/reports')}
+    ${!isAdmin() ? '' : item('#/admin', 'Reports dashboard', path === '/admin')}
     ${!ACCOUNTS ? '' : item('#/account', signedIn() ? 'My account & notes' : 'Sign in (optional)', path === '/account')}`;
   for (const k of openSubs) fillSub(k);
 }
