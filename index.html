@@ -14,14 +14,14 @@
   <meta property="og:title" content="Mysteries Wiki">
   <meta property="og:description" content="A spoiler-aware reading companion: only what is known up to the chapter you have read.">
   <meta name="theme-color" content="#221c15">
-  <link rel="icon" href="assets/20261031T003007849tyk/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/20261106T131050449df5/favicon.svg" type="image/svg+xml">
   <script>
     // apply the saved theme before the first paint (no flash)
     try { var t = localStorage.getItem('wiki.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
-  <link rel="preload" href="assets/20261031T003007849tyk/fonts/source-sans-3-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="assets/20261031T003007849tyk/fonts/im-fell-english-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/20261031T003007849tyk/style.css">
+  <link rel="preload" href="assets/20261106T131050449df5/fonts/source-sans-3-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/20261106T131050449df5/fonts/im-fell-english-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/20261106T131050449df5/style.css">
 </head>
 <body>
   <button class="skip-link" id="skip-link" type="button">Skip to content</button>
@@ -41,6 +41,7 @@
     <button id="search-toggle" class="search-trigger" type="button" aria-haspopup="dialog" aria-controls="palette" aria-expanded="false" aria-keyshortcuts="/" aria-label="Search">
       <span class="search-trigger-icon" aria-hidden="true">⌕</span><span class="search-trigger-text">Search the casebook</span><kbd aria-hidden="true">/</kbd>
     </button>
+    <a id="account-link" class="topbar-link" href="#/account" hidden>Sign in</a>
     <button id="theme-toggle" class="icon-btn theme-btn" type="button" aria-label="Toggle theme">◐</button>
 
     <div class="chapter-picker" id="chapter-sheet" role="group" aria-labelledby="picker-title">
@@ -83,6 +84,7 @@
       <p class="modal-lede">Nothing after your chapter is ever shown. You can change it any time.</p>
       <div class="modal-body" id="disclaimer-text"></div>
       <div class="shelf" id="disclaimer-shelf" role="radiogroup" aria-label="Volume"></div>
+      <p class="hint vol-info" id="disclaimer-vol-info" aria-live="polite"></p>
       <div class="modal-pick">
         <div class="pick-head">
           <label for="disclaimer-ch" id="disclaimer-vol-label">I have read up to chapter</label>
@@ -99,6 +101,18 @@
     </div>
   </div>
 
+  <div class="modal modal-confirm" id="confirm-ch" hidden>
+    <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+      <span class="kicker">Check your chapter</span>
+      <h2 id="confirm-title"></h2>
+      <p class="modal-body" id="confirm-text"></p>
+      <div class="modal-actions">
+        <button id="confirm-back" class="btn btn-quiet" type="button">Back</button>
+        <button id="confirm-yes" class="btn btn-light" type="button"></button>
+      </div>
+    </div>
+  </div>
+
   <div class="update-banner" id="update-banner" role="status" hidden></div>
 
   <div class="layout">
@@ -108,6 +122,6 @@
     <main class="content" id="content"><p class="muted">Loading…</p></main>
   </div>
 
-  <script type="module" src="assets/20261031T003007849tyk/js/main.js"></script>
+  <script type="module" src="assets/20261106T131050449df5/js/main.js"></script>
 </body>
 </html>
