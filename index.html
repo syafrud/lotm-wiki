@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="wiki-mode" content="static">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="wiki-official" content="https://www.webnovel.com/search?keywords=Lord%20of%20the%20Mysteries">
+  <meta name="wiki-text" content="on">
+  <meta name="wiki-home" content="https://lotm-wiki-bq2.pages.dev/">
+  <meta name="wiki-reports-url" content="https://ycfueparxdugyyjvcozl.supabase.co">
+  <meta name="wiki-reports-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZnVlcGFyeGR1Z3l5anZjb3psIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDE0NTUsImV4cCI6MjEwNzk3NzQ1NX0.t96NGICqC01YH41xwhI9QwVcmR52i07XZ1TTpuWQ4zM">
+  <meta name="wiki-accounts" content="on">
+  <meta name="wiki-captcha" content="0x4AAAAAAGAnvGMKdbZilvUS">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-P0aKt8TfVEdUlLUulX388/3kEvXCwNjaCkAjj/aI+N4=' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://ycfueparxdugyyjvcozl.supabase.co; font-src 'self'; connect-src 'self' https://ycfueparxdugyyjvcozl.supabase.co; worker-src 'self'; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <title>Mysteries Wiki</title>
+  <meta name="description" content="A spoiler-aware reading companion for Lord of the Mysteries: pick the chapter you have read, and the wiki shows only what is known up to it.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Mysteries Wiki">
+  <meta property="og:description" content="A spoiler-aware reading companion: only what is known up to the chapter you have read.">
+  <meta name="theme-color" content="#221c15">
+  <link rel="icon" href="assets/20261114T1251067987ym/favicon.svg" type="image/svg+xml">
+  <script>
+    // apply the saved theme before the first paint (no flash)
+    try { var t = localStorage.getItem('wiki.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+  <link rel="preload" href="assets/20261114T1251067987ym/fonts/source-sans-3-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/20261114T1251067987ym/fonts/im-fell-english-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/20261114T1251067987ym/style.css">
+</head>
+<body>
+  <button class="skip-link" id="skip-link" type="button">Skip to content</button>
+  <header class="topbar">
+    <button id="nav-toggle" class="icon-btn nav-toggle" type="button" aria-label="Open sections" aria-controls="sidebar" aria-expanded="false">☰</button>
+    <a class="brand" href="#/">Mysteries Wiki</a>
+    <!-- phones: this bar sits at the bottom of the screen, in thumb reach (design 2a) -->
+    <div class="reading-bar" id="reading-bar">
+      <button id="bar-prev" class="bar-step" type="button" title="Previous chapter (←)" aria-label="Previous chapter">‹</button>
+      <button id="reading-pill" class="reading-pill" type="button" aria-controls="chapter-sheet" aria-expanded="false" aria-label="Choose the chapter you have read up to">
+        <span class="pill-label">Reading<span id="reading-pill-vol-phone" class="pill-vol-phone"></span></span>
+        <span class="pill-where"><span id="reading-pill-vol" class="pill-vol"></span><strong id="reading-pill-ch">Ch 1</strong></span>
+        <span id="reading-pill-title" class="pill-title"></span><span class="pill-caret" aria-hidden="true">▾</span>
+      </button>
+      <button id="bar-next" class="bar-step" type="button" title="Next chapter (→)" aria-label="Next chapter">›</button>
+    </div>
+    <button id="search-toggle" class="search-trigger" type="button" aria-haspopup="dialog" aria-controls="palette" aria-expanded="false" aria-keyshortcuts="/" aria-label="Search">
+      <span class="search-trigger-icon" aria-hidden="true">⌕</span><span class="search-trigger-text">Search the casebook</span><kbd aria-hidden="true">/</kbd>
+    </button>
+    <a id="account-link" class="topbar-link" href="#/account" hidden>Sign in</a>
+    <button id="theme-toggle" class="icon-btn theme-btn" type="button" aria-label="Toggle theme">◐</button>
+
+    <div class="chapter-picker" id="chapter-sheet" role="group" aria-labelledby="picker-title">
+      <div class="sheet-head">
+        <span class="sheet-title" id="picker-title">Where are you in the story?</span>
+        <button id="sheet-close" class="icon-btn" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="vol-tabs" id="volume-tabs" role="tablist" aria-label="Volume"></div>
+      <div class="picker-row">
+        <label for="chapter-input">I have read up to chapter</label>
+        <input id="chapter-input" type="number" min="1" step="1" inputmode="numeric" autocomplete="off">
+        <span class="picker-steps">
+          <button id="chapter-prev" type="button" title="Previous chapter (←)" aria-label="Previous chapter">‹</button>
+          <button id="chapter-next" type="button" title="Next chapter (→)" aria-label="Next chapter">›</button>
+        </span>
+      </div>
+      <div class="ch-list" id="chapter-list" role="listbox" aria-label="Chapters" tabindex="0"></div>
+      <p class="picker-hint">Titles show up to the next chapter only. ← → step one chapter.</p>
+      <button id="sheet-theme" class="btn btn-outline sheet-theme" type="button">Switch theme</button>
+    </div>
+  </header>
+
+  <div class="palette" id="palette" hidden>
+    <div class="palette-card" role="dialog" aria-modal="true" aria-label="Search the casebook">
+      <form class="search" id="search-form" role="search">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input id="search-input" type="search" placeholder="Search the casebook" autocomplete="off" spellcheck="false"
+          aria-label="Search the wiki" role="combobox" aria-expanded="false" aria-controls="palette-list" aria-autocomplete="list">
+        <button type="button" class="palette-esc" id="palette-close" aria-label="Close search">esc</button>
+      </form>
+      <div class="palette-list" id="palette-list" role="listbox" aria-label="Results"></div>
+      <div class="palette-foot"><span>↑↓ move · ↵ open</span><span id="palette-scope"></span></div>
+    </div>
+  </div>
+
+  <div class="modal" id="disclaimer" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="disclaimer-title">
+      <span class="kicker">Before you read</span>
+      <h2 id="disclaimer-title">Which volume are you in?</h2>
+      <p class="modal-lede">Nothing after your chapter is ever shown. You can change it any time.</p>
+      <div class="modal-body" id="disclaimer-text"></div>
+      <div class="shelf" id="disclaimer-shelf" role="radiogroup" aria-label="Volume"></div>
+      <p class="hint vol-info" id="disclaimer-vol-info" aria-live="polite"></p>
+      <div class="modal-pick">
+        <div class="pick-head">
+          <label for="disclaimer-ch" id="disclaimer-vol-label">I have read up to chapter</label>
+          <input id="disclaimer-ch" type="number" min="1" step="1" inputmode="numeric" aria-describedby="disclaimer-ch-hint">
+        </div>
+        <input id="disclaimer-range" class="pick-range" type="range" min="1" step="1" aria-label="Chapter">
+        <div class="pick-scale"><span id="disclaimer-min"></span><span id="disclaimer-max"></span></div>
+        <p class="hint" id="disclaimer-ch-hint">Nothing after this chapter will be shown.</p>
+      </div>
+      <div class="modal-actions">
+        <a class="modal-link needs-reports" href="#/report" id="disclaimer-report">Report an error</a>
+        <button id="disclaimer-ok" class="btn btn-light" type="button">Start reading</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal modal-confirm" id="confirm-ch" hidden>
+    <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+      <span class="kicker">Check your chapter</span>
+      <h2 id="confirm-title"></h2>
+      <p class="modal-body" id="confirm-text"></p>
+      <div class="modal-actions">
+        <button id="confirm-back" class="btn btn-quiet" type="button">Back</button>
+        <button id="confirm-yes" class="btn btn-light" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="update-banner" id="update-banner" role="status" hidden></div>
+
+  <div class="layout">
+    <div id="nav-overlay" class="nav-overlay"></div>
+    <div id="sheet-overlay" class="sheet-overlay" hidden></div>
+    <nav class="sidebar" id="sidebar" aria-label="Sections"></nav>
+    <main class="content" id="content"><p class="muted">Loading…</p></main>
+  </div>
+
+  <script type="module" src="assets/20261114T1251067987ym/js/main.js"></script>
+</body>
+</html>

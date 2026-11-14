@@ -1,0 +1,114 @@
+[
+ {
+  "id": "2026-11-14T13:06Z",
+  "date": "2026-11-14",
+  "build": "20261114T1251067987ym",
+  "note": "Each chapter now has a reading page: finish it there and the wiki moves on with you, and every \"ch N\" on an entry opens its chapter.",
+  "more": true
+ },
+ {
+  "id": "2026-11-14T10:30Z",
+  "date": "2026-11-14",
+  "build": "20261114T102518493hu6",
+  "note": "Signing in is clearer: a failed sign-in now shows a red message and marks the field to check, and the welcome note mentions that you can sign in.",
+  "more": true
+ },
+ {
+  "id": "2026-11-14T10:14Z",
+  "date": "2026-11-14",
+  "build": "20261114T101355717wpf",
+  "note": "The wiki has a new address: https://lotm-wiki-bq2.pages.dev/ — the old one sends you there on its own, keeping the page and chapter you were on.",
+  "more": true
+ },
+ {
+  "id": "2026-11-08T05:17Z",
+  "date": "2026-11-08",
+  "build": "20261108T051148137z6u",
+  "note": "Volume 2 so far (chapters 214–321) was read again against the text: facts were checked and corrected, missing details added, memberships and items now end in the chapter that ends them, and \"The story so far\" now reaches chapter 300.",
+  "more": true
+ },
+ {
+  "id": "2026-11-06T16:06Z",
+  "date": "2026-11-06",
+  "build": "20261106T154338294kfr",
+  "note": "Your reports now get an answer: each one shows how far it has come, finished reports stay in a public History with a link to the update that dealt with them, and you can add a picture or a name to be credited.",
+  "more": true
+ },
+ {
+  "id": "2026-11-06T14:34Z",
+  "date": "2026-11-06",
+  "build": "20261106T140113902x6f",
+  "note": "You can now make a free account, if you want one: your chapter, your settings and your private notes then follow you to your other devices. It is optional, and everything keeps working without it.",
+  "more": true
+ },
+ {
+  "id": "2026-11-06T13:33Z",
+  "date": "2026-11-06",
+  "build": "20261106T131050449df5",
+  "note": "Entries now agree with each other: pathways with their Sequences, organisations with their members, items with their owners. Empty entries were filled from the text, Open questions show their answers once you have read them, and the wiki asks before jumping ahead. Fact counts now match what a page lists.",
+  "more": true
+ },
+ {
+  "id": "2026-10-31T00:33Z",
+  "date": "2026-10-31",
+  "build": "20261031T003007849tyk",
+  "note": "Every Volume 1 fact was re-read against its chapter: facts that appeared too early now appear in the chapter that reveals them, missing details were added, and details the text does not support were removed.",
+  "more": true
+ },
+ {
+  "id": "2026-10-24T13:21Z",
+  "date": "2026-10-24",
+  "build": "20261024T1316051106lo",
+  "note": "Pathway and Sequence data for Volume 1 was re-read against the text: missing Sequence numbers were added (e.g. Arbiter), numbers that appeared too early now appear in the chapter that reveals them, and Sequences without a known number are shown on the ladder.",
+  "more": true
+ },
+ {
+  "id": "2026-10-23T13:07Z",
+  "date": "2026-10-23",
+  "build": "20261023T130428735elc",
+  "note": "Pathways are now named after their Sequence 9 (as the story names them), every Sequence 9 sits in its own pathway, and the Sequence ladder only shows the ranks the story has revealed. The volume shelf lists all volumes; a link to the complete (spoiler-filled) Fandom wiki was added.",
+  "more": true
+ },
+ {
+  "id": "2026-10-23T11:24Z",
+  "date": "2026-10-23",
+  "build": "20261023T111420440yh1",
+  "note": "Volume 1 tidied up: characters now show their Sequences in a Progress tab, memberships and items end when the story ends them, every pathway has its proper name and ladder, and chapter summaries for chapters 101–213 are shorter and easier to read.",
+  "more": true
+ },
+ {
+  "id": "2026-10-23T10:05Z",
+  "date": "2026-10-23",
+  "build": "20261023T095959494p4e",
+  "note": "Pages now work like a big wiki: tabs for relationships, abilities, possessions and history, member lists for organisations, a ladder of Sequences for every pathway (see Pathways & Sequences), an A–Z row in lists, and a portal at the end of each chapter page.",
+  "more": true
+ },
+ {
+  "id": "2026-10-19T11:22Z",
+  "date": "2026-10-19",
+  "build": "20261019T110141611z1t",
+  "note": "You can now report mistakes from any page: use Report an error. Reports are public, but you only see the ones sent from chapters you have already read, and reports marked as spoilers stay hidden.",
+  "more": true
+ },
+ {
+  "id": "2026-10-19T06:41Z",
+  "date": "2026-10-19",
+  "build": "20261019T063716331uaz",
+  "note": "A new look: the wiki is now a Victorian casebook. Chapters are picked from a titled list, press / to search from any page, every entry shows when it appears in the story, and on phones the chapter control sits at the bottom of the screen.",
+  "more": true
+ },
+ {
+  "id": "2026-10-19T00:28Z",
+  "date": "2026-10-19",
+  "build": "20261019T0024554332ri",
+  "note": "Diary pages: the dated entries of Roselle's diary and Klein's notebook, word for word, in a new Entries tab and on each chapter's page. The wiki now tells you what changed after each update.",
+  "more": true
+ },
+ {
+  "id": "2026-10-18T23:30Z",
+  "date": "2026-10-18",
+  "build": "20261018T232544303cco",
+  "note": "Faster pages and self-hosted fonts: the wiki downloads about half as much on phones and answers searches and pages more quickly.",
+  "more": true
+ }
+]

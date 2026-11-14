@@ -1,0 +1,6 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-P0aKt8TfVEdUlLUulX388/3kEvXCwNjaCkAjj/aI+N4=' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://ycfueparxdugyyjvcozl.supabase.co; font-src 'self'; connect-src 'self' https://ycfueparxdugyyjvcozl.supabase.co; worker-src 'self'; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1,0 +1,28 @@
+// Which build this page is: the Node server (default) or the static site that `node cli.js
+// export-site` writes for GitHub Pages (PLAN B0), marked with <meta name="wiki-mode" content="static">.
+// The static site has no server: the database runs in the browser, and reader reports go to
+// Supabase when export-site was given its address (config/site.json, meta "wiki-reports-url").
+export const STATIC =
+  document.querySelector('meta[name="wiki-mode"]')?.content === "static";
+
+const meta = (name) =>
+  document.querySelector(`meta[name="${name}"]`)?.content ?? "";
+export const REPORTS_REMOTE =
+  STATIC && meta("wiki-reports-url")
+    ? {
+        url: meta("wiki-reports-url").replace(/\/+$/, ""),
+        key: meta("wiki-reports-key"),
+      }
+    : null;
+// can readers send and read reports here?
+export const REPORTS = !STATIC || !!REPORTS_REMOTE;
+// optional reader accounts: on the same Supabase, once the owner has set them up (config/site.json)
+export const ACCOUNTS_ON = !!REPORTS_REMOTE && meta("wiki-accounts") === "on";
+export const CAPTCHA_KEY = meta("wiki-captcha"); // Cloudflare Turnstile site key, public by design
+// where the static site sends readers for the novel's text (PLAN R2): it has no copy of it
+export const OFFICIAL_URL = meta("wiki-official");
+export const TEXT_ON = STATIC && meta("wiki-text") === "on";
+
+// CSS hides `.needs-server` elements on the static site and `.needs-reports` where reports are off.
+document.documentElement.dataset.mode = STATIC ? "static" : "server";
+document.documentElement.dataset.reports = REPORTS ? "on" : "off";

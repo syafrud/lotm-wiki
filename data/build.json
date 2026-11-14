@@ -1,0 +1,34 @@
+{
+ "id": "20261114T1251067987ym",
+ "built_at": "2026-11-14T12:51:07.732Z",
+ "chapters": 328,
+ "facts": 45076,
+ "format": 4,
+ "file": "wiki-20261114T1251067987ym.db.gz",
+ "db_bytes": 10186752,
+ "gz_bytes": 3292259,
+ "indexes": [
+  "CREATE INDEX chapter_notes_ch ON chapter_notes(ch)",
+  "CREATE INDEX diary_entries_ch ON diary_entries(ch)",
+  "CREATE INDEX diary_entries_entity ON diary_entries(section, id, ch)",
+  "CREATE INDEX entity_chapters_ch ON entity_chapters(ch)",
+  "CREATE INDEX entity_names_entity ON entity_names(section, id)",
+  "CREATE INDEX facts_ch ON facts(ch)",
+  "CREATE INDEX facts_entity ON facts(section, entity_id, ch)",
+  "CREATE INDEX facts_field ON facts(section, entity_id, field, ch)",
+  "CREATE INDEX refs_dst ON refs(dst_section, dst_id, ch)",
+  "CREATE INDEX refs_src ON refs(src_section, src_id)"
+ ],
+ "fts": [
+  {
+   "name": "facts_fts",
+   "create": "CREATE VIRTUAL TABLE facts_fts USING fts5(value, content='facts', content_rowid='id')",
+   "rebuild": "INSERT INTO facts_fts(facts_fts) VALUES ('rebuild')"
+  },
+  {
+   "name": "names_fts",
+   "create": "CREATE VIRTUAL TABLE names_fts USING fts5(value, content='entity_names')",
+   "rebuild": "INSERT INTO names_fts(names_fts) VALUES ('rebuild')"
+  }
+ ]
+}
