@@ -1,0 +1,8 @@
+[
+ "Changed on the site:",
+ "- \"Reading now\" (how many readers have the wiki open, and how many are at your chapter) is in the top bar, between Reading and Search. On phones it stays in the menu",
+ "- About has a short privacy note: visits are counted once a day per browser, with a random id, no address and no list of pages",
+ "- Admins see reader counts (today, this week, this month, this year) on their dashboard",
+ "Credits:",
+ "- Website: Alpha (developer)"
+]
